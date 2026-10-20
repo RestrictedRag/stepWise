@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { extractJson, generateLesson } from "./lesson.ts";
 
-const req = { topic: "the cell", persona: "teacher", level: "middle", lang: "en" } as const;
+const req = { topic: "the cell", persona: "teacher", level: "middle", lang: "en", style: "", fromQuestion: false } as const;
 const good = JSON.stringify({ title: "T", subtitle: null, steps: [{ say: "Hi.", draw: [{ type: "circle", x: 500, y: 350, r: 50, color: "blue" }] }] });
 
 test("extractJson strips think blocks and prose", () => {

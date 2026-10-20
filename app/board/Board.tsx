@@ -1,9 +1,9 @@
 "use client";
-import { useId, useRef } from "react";
+import { useId, useRef, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { W, H, seedFrom, focusBox, type Shape as ShapeData, type Step, type Color, type Icon } from "../../lib/board";
 
-const INTRO = 1.5; // seconds the title card holds before step 0 starts
+const INTRO = 2.4; // title card: 1.5s write-on, short hold, 0.8s move up; step 0 starts after
 const STROKE = 0.35, CHAR = 0.02; // seconds per stroke / per typed character
 
 const ICON_PATHS: Record<Icon, string> = {
@@ -19,12 +19,12 @@ const ICON_PATHS: Record<Icon, string> = {
 
 const cost = (s: ShapeData) => (s.type === "text" ? s.text.length * CHAR : s.type === "label" ? (s.text.length + (s.note?.length ?? 0)) * CHAR : STROKE);
 // Total seconds a step takes to draw, used by the player to pace autoplay.
-export const stepSeconds = (step: Step) => step.draw.reduce((t, s) => t + cost(s), 0);
+export const stepSeconds = (step: Step, first = false) => (first ? INTRO : 0) + step.draw.reduce((t, s) => t + cost(s), 0);
 
-function Typed({ x, y, text, size, color, delay, bold, rotate = 0 }: { x: number; y: number; text: string; size: number; color: Color; delay: number; bold?: boolean; rotate?: number }) {
+function Typed({ x, y, text, size, color, delay, bold, rotate = 0, dur }: { x: number; y: number; text: string; size: number; color: Color; delay: number; bold?: boolean; rotate?: number; dur?: number }) {
   return (
-    <text className="t" x={x} y={y} fontSize={size} transform={rotate ? `rotate(${rotate} ${x} ${y})` : undefined} fontWeight={bold ? 700 : 400}
-      style={{ fill: `var(--c-${color})`, animationDelay: `${delay}s`, animationDuration: `${text.length * CHAR}s`, animationTimingFunction: `steps(${text.length})` }}>
+    <text className="t" textAnchor="middle" x={x} y={y} fontSize={size} transform={rotate ? `rotate(${rotate} ${x} ${y})` : undefined} fontWeight={bold ? 700 : 400}
+      style={{ fill: `var(--c-${color})`, animationDelay: `${delay}s`, animationDuration: `${dur ?? text.length * CHAR}s`, animationTimingFunction: `steps(${text.length})` }}>
       {text}
     </text>
   );
@@ -35,8 +35,11 @@ function Bleed({ at, color, delay, done }: { at: [number, number]; color: Color;
   return <motion.circle cx={at[0]} cy={at[1]} r={3} style={{ fill: `var(--c-${color})` }} initial={done ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: delay + STROKE - 0.1, duration: 0.15 }} />;
 }
 
-function Shape({ s, delay, done, wobble }: { s: ShapeData; delay: number; done: boolean; wobble: string }) {
-  const stroke = { stroke: `var(--c-${s.color})`, animationDelay: `${delay}s`, animationTimingFunction: "ease-in-out", filter: `url(#${wobble})` };
+// shortcut: end point = last coordinate pair in the path string (wrong if it ends in H/V), fine for model doodles; switch to getPointAtLength if dots land off the stroke
+const pathEnd = (d: string): [number, number] => { const n = d.match(/-?\d+(?:\.\d+)?/g)!.map(Number); return [n[n.length - 2], n[n.length - 1]]; };
+
+function Shape({ s, delay, done }: { s: ShapeData; delay: number; done: boolean }) {
+  const stroke = { stroke: `var(--c-${s.color})`, animationDelay: `${delay}s`, animationTimingFunction: "ease-in-out" };
   const p = { className: "s", pathLength: 1, style: stroke };
   const dot = (at: [number, number]) => <Bleed at={at} color={s.color} delay={delay} done={done} />;
   switch (s.type) {
@@ -53,8 +56,11 @@ function Shape({ s, delay, done, wobble }: { s: ShapeData; delay: number; done: 
     case "circle": return <g><circle {...p} cx={s.x} cy={s.y} r={s.r} />{dot([s.x + s.r, s.y])}</g>;
     case "ellipse": return <g><ellipse {...p} cx={s.x} cy={s.y} rx={s.rx} ry={s.ry} />{dot([s.x + s.rx, s.y])}</g>;
     case "rect": return <g><rect {...p} x={s.x} y={s.y} width={s.w} height={s.h} />{dot([s.x, s.y])}</g>;
-    case "path": return <path {...p} d={s.d} />;
-    case "icon": return <path {...p} d={ICON_PATHS[s.name]} transform={`translate(${s.x - 20} ${s.y - 20})`} />;
+    case "path": return <g><path {...p} d={s.d} />{dot(pathEnd(s.d))}</g>;
+    case "icon": {
+      const [ex, ey] = pathEnd(ICON_PATHS[s.name]);
+      return <g><path {...p} d={ICON_PATHS[s.name]} transform={`translate(${s.x - 20} ${s.y - 20})`} />{dot([s.x - 20 + ex, s.y - 20 + ey])}</g>;
+    }
     case "text": return <Typed x={s.x} y={s.y} text={s.text} size={s.size} color={s.color} delay={delay} />;
     case "label":
       return (
@@ -72,8 +78,9 @@ export default function Board({ steps, current, run, title, subtitle, delays }: 
   const wobble = `wob${useId().replace(/:/g, "")}`;
   const first = useRef(run).current;
   const lead = current === 0 && run === first ? INTRO : 0; // title card plays only on first mount
+  const box = steps[current] ? focusBox(steps[current].draw) : [0, 0, W, H];
   return (
-    <motion.svg className="board" initial={{ viewBox: `0 0 ${W} ${H}` }} animate={{ viewBox: focusBox(steps[current].draw).join(" ") }}
+    <motion.svg className="board" initial={{ viewBox: `0 0 ${W} ${H}` }} animate={{ viewBox: box.join(" ") }}
       transition={{ duration: 1.2, ease: "easeInOut", delay: lead }} role="img" aria-label={`Whiteboard: ${title}`}>
       <defs>
         <filter id={wobble} filterUnits="userSpaceOnUse" x={0} y={0} width={W} height={H}>
@@ -83,20 +90,24 @@ export default function Board({ steps, current, run, title, subtitle, delays }: 
       </defs>
       {steps.slice(0, current + 1).map((step, i) => {
         let t = i === current ? lead : 0;
+        const ink: ReactNode[] = [], words: ReactNode[] = []; // wobble the strokes once per step, never the text
+        step.draw.forEach((s, j) => {
+          const delay = i === current && delays?.[j] !== undefined ? delays[j] + lead : t;
+          t += cost(s);
+          (s.type === "text" || s.type === "label" ? words : ink).push(<Shape key={j} s={s} delay={delay} done={i < current} />);
+        });
         return (
           <g key={i === current ? `${i}-${run}` : i} className={i < current ? "done" : undefined}>
-            {step.draw.map((s, j) => {
-              const delay = i === current && delays?.[j] !== undefined ? delays[j] + lead : t;
-              t += cost(s);
-              return <Shape key={j} s={s} delay={delay} done={i < current} wobble={wobble} />;
-            })}
+            <g filter={`url(#${wobble})`}>{ink}</g>
+            {words}
           </g>
         );
       })}
       {lead > 0 && (
-        <motion.g initial={{ opacity: 1 }} animate={{ opacity: 0 }} transition={{ delay: INTRO, duration: 0.6, ease: "easeInOut" }} style={{ pointerEvents: "none" }}>
-          <Typed x={W / 2} y={H / 2 - 10} text={title} size={64} color="ink" delay={0} bold />
-          {subtitle && <Typed x={W / 2} y={H / 2 + 50} text={subtitle} size={34} color="purple" delay={title.length * CHAR} />}
+        <motion.g initial={{ y: 0, scale: 1 }} animate={{ y: -300, scale: 0.4 }} transition={{ delay: INTRO - 0.8, duration: 0.8, ease: "easeInOut" }}
+          style={{ pointerEvents: "none", transformBox: "view-box", transformOrigin: `${W / 2}px ${H / 2}px` }}>
+          <Typed x={W / 2} y={H / 2 - 10} text={title} size={64} color="ink" delay={0} dur={subtitle ? 1 : 1.5} bold />
+          {subtitle && <Typed x={W / 2} y={H / 2 + 50} text={subtitle} size={34} color="purple" delay={1} dur={0.5} />}
         </motion.g>
       )}
     </motion.svg>

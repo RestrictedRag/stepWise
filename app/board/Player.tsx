@@ -34,7 +34,7 @@ export default function Player({ script, autoplay = false, bare = false }: { scr
     if (i >= last) { setPlaying(false); return; }
     if (voice && heard !== i) return; // wait for the narration to end
     // muted: fixed reading pace for the caption
-    const ms = voice ? 400 : (stepSeconds(steps[i]) + 0.5 + steps[i].say.length * 0.012) * 1000;
+    const ms = voice ? 400 : (stepSeconds(steps[i], i === 0) + 0.5 + steps[i].say.length * 0.012) * 1000;
     const id = setTimeout(() => setI(i + 1), ms);
     return () => clearTimeout(id);
   }, [playing, i, last, steps, voice, heard]);
