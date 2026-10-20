@@ -1,0 +1,47 @@
+{
+  "title": "Photosynthesis",
+  "subtitle": "How a leaf makes lunch from light.",
+  "steps": [
+    {
+      "say": "A leaf is basically a solar-powered kitchen.",
+      "draw": [
+        { "type": "path", "d": "M300 500 Q350 220 700 200 Q650 480 300 500 Z", "color": "green" },
+        { "type": "path", "d": "M300 500 Q500 380 700 200", "color": "green" }
+      ]
+    },
+    {
+      "say": "Sunlight is the energy source. Green chlorophyll in the leaf catches it.",
+      "draw": [
+        { "type": "circle", "x": 120, "y": 110, "r": 45, "color": "orange" },
+        { "type": "icon", "x": 120, "y": 110, "name": "star", "color": "orange" },
+        { "type": "arrow", "from": [175, 150], "to": [400, 310], "color": "orange" },
+        { "type": "label", "x": 130, "y": 240, "text": "Sunlight", "note": "the energy", "color": "orange" }
+      ]
+    },
+    {
+      "say": "Carbon dioxide comes in from the air, and water comes up from the roots.",
+      "draw": [
+        { "type": "arrow", "from": [900, 360], "to": [660, 360], "color": "ink" },
+        { "type": "text", "x": 810, "y": 330, "text": "CO₂ from the air", "size": 28, "color": "ink" },
+        { "type": "arrow", "from": [440, 680], "to": [430, 480], "color": "blue" },
+        { "type": "text", "x": 600, "y": 660, "text": "H₂O from the roots", "size": 28, "color": "blue" }
+      ]
+    },
+    {
+      "say": "Out comes oxygen, which we breathe, and glucose, the sugar the plant lives on.",
+      "draw": [
+        { "type": "arrow", "from": [580, 430], "to": [780, 530], "color": "ink" },
+        { "type": "text", "x": 830, "y": 575, "text": "O₂ out (you're welcome)", "size": 28, "color": "ink" },
+        { "type": "text", "x": 545, "y": 310, "text": "glucose", "size": 30, "color": "green" }
+      ]
+    },
+    {
+      "say": "Recap: light plus carbon dioxide plus water becomes glucose plus oxygen.",
+      "draw": [
+        { "type": "text", "x": 540, "y": 60, "text": "light + CO₂ + H₂O", "size": 34, "color": "ink" },
+        { "type": "text", "x": 540, "y": 110, "text": "→ glucose + O₂", "size": 34, "color": "green" },
+        { "type": "icon", "x": 760, "y": 80, "name": "check", "color": "green" }
+      ]
+    }
+  ]
+}

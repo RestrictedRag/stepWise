@@ -1,0 +1,46 @@
+{
+  "title": "Pythagoras in one picture",
+  "subtitle": "Why a² + b² = c².",
+  "steps": [
+    {
+      "say": "Take a right triangle. Call the short sides a and b, and the long side c.",
+      "draw": [
+        { "type": "path", "d": "M380 460 L560 460 L380 220 Z", "color": "ink" },
+        { "type": "path", "d": "M380 435 L405 435 L405 460", "color": "ink" },
+        { "type": "text", "x": 362, "y": 350, "text": "a", "size": 32, "color": "blue" },
+        { "type": "text", "x": 470, "y": 490, "text": "b", "size": 32, "color": "red" },
+        { "type": "text", "x": 455, "y": 330, "text": "c", "size": 32, "color": "green" }
+      ]
+    },
+    {
+      "say": "Build a square on side a. With a = 4, its area is 16.",
+      "draw": [
+        { "type": "rect", "x": 140, "y": 220, "w": 240, "h": 240, "color": "blue" },
+        { "type": "text", "x": 260, "y": 350, "text": "a² = 16", "size": 36, "color": "blue" }
+      ]
+    },
+    {
+      "say": "Now one on side b. With b = 3, its area is 9.",
+      "draw": [
+        { "type": "rect", "x": 380, "y": 460, "w": 180, "h": 180, "color": "red" },
+        { "type": "text", "x": 470, "y": 560, "text": "b² = 9", "size": 36, "color": "red" }
+      ]
+    },
+    {
+      "say": "And a square on the long side c. With c = 5, its area is 25.",
+      "draw": [
+        { "type": "path", "d": "M560 460 L380 220 L620 40 L800 280 Z", "color": "green" },
+        { "type": "text", "x": 590, "y": 260, "text": "c² = 25", "size": 36, "color": "green" }
+      ]
+    },
+    {
+      "say": "The two small squares add up exactly to the big one. That is the whole theorem.",
+      "draw": [
+        { "type": "text", "x": 820, "y": 520, "text": "16 + 9 = 25", "size": 40, "color": "ink" },
+        { "type": "highlight", "from": [712, 598], "to": [928, 598], "color": "purple" },
+        { "type": "text", "x": 820, "y": 600, "text": "a² + b² = c²", "size": 44, "color": "purple" },
+        { "type": "icon", "x": 955, "y": 510, "name": "check", "color": "green" }
+      ]
+    }
+  ]
+}

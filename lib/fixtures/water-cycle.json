@@ -1,0 +1,54 @@
+{
+  "title": "The water cycle",
+  "subtitle": "Water's endless commute.",
+  "steps": [
+    {
+      "say": "Start with the ocean, and the sun beating down on it.",
+      "draw": [
+        { "type": "path", "d": "M40 600 Q90 580 140 600 T240 600 T340 600 T440 600 T540 600", "color": "blue" },
+        { "type": "text", "x": 290, "y": 650, "text": "ocean", "size": 30, "color": "blue" },
+        { "type": "circle", "x": 110, "y": 110, "r": 45, "color": "orange" },
+        { "type": "icon", "x": 110, "y": 110, "name": "star", "color": "orange" }
+      ]
+    },
+    {
+      "say": "The sun heats the water and some of it rises as invisible vapour. That's evaporation.",
+      "draw": [
+        { "type": "arrow", "from": [220, 570], "to": [220, 330], "color": "blue" },
+        { "type": "arrow", "from": [320, 570], "to": [320, 330], "color": "blue" },
+        { "type": "label", "x": 440, "y": 450, "text": "Evaporation", "note": "water turns into vapour", "color": "blue" }
+      ]
+    },
+    {
+      "say": "High up it cools and clumps into tiny droplets. That's condensation, and it makes clouds.",
+      "draw": [
+        { "type": "path", "d": "M200 250 Q180 200 230 190 Q250 140 310 160 Q360 130 390 180 Q440 190 420 240 Z", "color": "ink" },
+        { "type": "label", "x": 560, "y": 120, "text": "Condensation", "note": "vapour cools into clouds", "color": "ink" }
+      ]
+    },
+    {
+      "say": "Wind pushes the clouds inland, toward the mountains.",
+      "draw": [
+        { "type": "arrow", "from": [440, 215], "to": [600, 215], "color": "ink" },
+        { "type": "path", "d": "M620 250 Q600 200 650 190 Q670 140 730 160 Q780 130 810 180 Q860 190 840 240 Z", "color": "ink" }
+      ]
+    },
+    {
+      "say": "The droplets get heavy and fall as rain or snow. That's precipitation.",
+      "draw": [
+        { "type": "path", "d": "M560 620 L720 330 L800 450 L860 380 L960 620", "color": "green" },
+        { "type": "line", "from": [680, 270], "to": [665, 320], "color": "blue" },
+        { "type": "line", "from": [730, 270], "to": [715, 320], "color": "blue" },
+        { "type": "line", "from": [780, 270], "to": [765, 320], "color": "blue" },
+        { "type": "label", "x": 900, "y": 300, "text": "Precipitation", "color": "blue" }
+      ]
+    },
+    {
+      "say": "Rain runs downhill back to the ocean, and the whole commute starts again.",
+      "draw": [
+        { "type": "arrow", "from": [650, 580], "to": [520, 610], "color": "blue" },
+        { "type": "label", "x": 640, "y": 655, "text": "Runoff", "note": "back to the ocean, repeat", "color": "blue" }
+      ]
+    }
+  ]
+}

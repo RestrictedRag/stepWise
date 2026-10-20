@@ -1,0 +1,63 @@
+{
+  "title": "The cell's group chat",
+  "subtitle": "Same cell. A lot of drama.",
+  "steps": [
+    {
+      "say": "Meet the cell. Think of it as one big group chat where everyone has a job and an opinion.",
+      "draw": [
+        { "type": "ellipse", "x": 500, "y": 370, "rx": 420, "ry": 290, "color": "purple" },
+        { "type": "text", "x": 500, "y": 52, "text": "cell membrane = the bouncer", "size": 28, "color": "purple" }
+      ]
+    },
+    {
+      "say": "The nucleus is the main character. She holds the DNA and honestly thinks she runs the place.",
+      "draw": [
+        { "type": "circle", "x": 500, "y": 330, "r": 90, "color": "purple" },
+        { "type": "icon", "x": 500, "y": 215, "name": "crown", "color": "orange" },
+        { "type": "label", "x": 760, "y": 190, "text": "Nucleus", "note": "thinks she runs the place", "color": "purple" },
+        { "type": "arrow", "from": [680, 240], "to": [590, 295], "color": "purple" }
+      ]
+    },
+    {
+      "say": "Inside her: DNA, the instruction manual for literally everything the cell builds.",
+      "draw": [
+        { "type": "text", "x": 500, "y": 322, "text": "DNA +", "size": 28, "color": "ink" },
+        { "type": "text", "x": 500, "y": 356, "text": "instructions", "size": 28, "color": "ink" }
+      ]
+    },
+    {
+      "say": "Meanwhile the mitochondria are doing the actual work, burning sugar to make energy.",
+      "draw": [
+        { "type": "ellipse", "x": 300, "y": 450, "rx": 85, "ry": 42, "color": "orange" },
+        { "type": "path", "d": "M230 450 Q245 425 260 450 T290 450 T320 450 T350 450 T370 450", "color": "orange" },
+        { "type": "icon", "x": 300, "y": 380, "name": "bolt", "color": "orange" },
+        { "type": "label", "x": 300, "y": 535, "text": "Mitochondria", "note": "doing the actual work", "color": "orange" }
+      ]
+    },
+    {
+      "say": "Their output is ATP. That is usable energy, the currency every other part spends.",
+      "draw": [
+        { "type": "highlight", "from": [215, 602], "to": [385, 602], "color": "orange" },
+        { "type": "text", "x": 300, "y": 610, "text": "ATP = usable energy", "size": 26, "color": "ink" }
+      ]
+    },
+    {
+      "say": "The ribosomes quietly build proteins from the nucleus's instructions. Zero drama.",
+      "draw": [
+        { "type": "circle", "x": 700, "y": 450, "r": 10, "color": "green" },
+        { "type": "circle", "x": 745, "y": 480, "r": 10, "color": "green" },
+        { "type": "circle", "x": 690, "y": 505, "r": 10, "color": "green" },
+        { "type": "circle", "x": 760, "y": 430, "r": 10, "color": "green" },
+        { "type": "label", "x": 720, "y": 555, "text": "Ribosomes", "note": "build proteins, zero drama", "color": "green" }
+      ]
+    },
+    {
+      "say": "Recap: the nucleus sends orders, ribosomes build, mitochondria power it all. Group chat, sorted.",
+      "draw": [
+        { "type": "arrow", "from": [585, 370], "to": [680, 435], "color": "blue" },
+        { "type": "text", "x": 690, "y": 380, "text": "orders", "size": 24, "color": "blue" },
+        { "type": "icon", "x": 830, "y": 460, "name": "check", "color": "green" }
+      ]
+    }
+  ]
+}
