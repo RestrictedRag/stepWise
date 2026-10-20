@@ -25,9 +25,10 @@ export function parseSolveRequest(body: any): SolveRequest {
 export const PERSONAS = ["teacher", "gossip", "coach", "story"] as const;
 export const LEVELS = ["primary", "middle", "high", "college"] as const;
 export const LANGS = ["en", "hi", "kn", "ta"] as const;
-const MAX_TOPIC = 300;
+export const MAX_TOPIC = 600;
+const MAX_STYLE = 80;
 
-export type LessonRequest = { topic: string; persona: (typeof PERSONAS)[number]; level: (typeof LEVELS)[number]; lang: (typeof LANGS)[number] };
+export type LessonRequest = { topic: string; persona: (typeof PERSONAS)[number]; level: (typeof LEVELS)[number]; lang: (typeof LANGS)[number]; style: string; fromQuestion: boolean };
 const pick = <T extends string>(list: readonly T[], v: unknown, dflt: T): T | null =>
   v == null || v === "" ? dflt : (list as readonly unknown[]).includes(v) ? (v as T) : null;
 
@@ -40,5 +41,6 @@ export function parseLessonRequest(body: any): (LessonRequest & { error?: undefi
   const level = pick(LEVELS, body?.level, "middle");
   const lang = pick(LANGS, body?.lang, "en");
   if (!persona || !level || !lang) return { error: "Unknown persona, level or language." };
-  return { topic, persona, level, lang };
+  const style = typeof body?.style === "string" ? body.style.replace(/\s+/g, " ").trim().slice(0, MAX_STYLE) : "";
+  return { topic, persona, level, lang, style, fromQuestion: body?.fromQuestion === true };
 }

@@ -1,8 +1,6 @@
-import { parseSolveRequest } from "../../../lib/validate";
+import { parseSolveRequest, MAX_TOPIC } from "../../../lib/validate";
 import { geminiText } from "../../../lib/gemini";
 import { parseLocate } from "../../../lib/locate";
-
-const MAX_ASK = 600;
 
 const PROMPT = (ask: string) =>
   `This is one page of a student's PDF. Find the question the student means by: "${ask}". ` +
@@ -18,7 +16,8 @@ export async function POST(req: Request) {
   } catch {
     return Response.json({ error: "Invalid JSON." }, { status: 400 });
   }
-  const ask = typeof body?.ask === "string" ? body.ask.trim().slice(0, MAX_ASK) : "";
+  // The ask is later fed as a lesson topic, so cap it at MAX_TOPIC.
+  const ask = typeof body?.ask === "string" ? body.ask.trim().slice(0, MAX_TOPIC) : "";
   const parsed = parseSolveRequest({ image: body?.image });
   if (parsed.error) return Response.json({ error: parsed.error }, { status: 400 });
   if (!parsed.image || !ask) return Response.json({ error: "Send a page image and what to find." }, { status: 400 });

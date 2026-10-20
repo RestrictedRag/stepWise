@@ -1,6 +1,5 @@
 import { extractJson } from "./lesson.ts";
-
-const MAX_QUESTION = 600;
+import { MAX_TOPIC } from "./validate.ts";
 
 export type Located = { question: string; bbox: [number, number, number, number] } | { missing: true };
 
@@ -13,7 +12,7 @@ export function parseLocate(raw: unknown): Located {
   if (typeof raw === "string") {
     try { v = extractJson(raw); } catch { return MISSING; }
   }
-  const question = typeof v?.question === "string" ? v.question.trim().slice(0, MAX_QUESTION) : "";
+  const question = typeof v?.question === "string" ? v.question.trim().slice(0, MAX_TOPIC) : "";
   const b = v?.bbox;
   if (!question || !Array.isArray(b) || b.length !== 4 || !b.every((n) => typeof n === "number" && Number.isFinite(n))) return MISSING;
   const [x, y] = [clamp01(b[0]), clamp01(b[1])];
