@@ -8,6 +8,9 @@ const ICON_PATHS: Record<Icon, string> = {
   star: "M20 3 L25 15 L38 15 L27 23 L31 36 L20 28 L9 36 L13 23 L2 15 L15 15 Z",
   check: "M6 21 L16 31 L35 8",
   cross: "M8 8 L32 32 M32 8 L8 32",
+  heart: "M20 34 C4 22 4 10 12 8 C16 7 19 10 20 13 C21 10 24 7 28 8 C36 10 36 22 20 34 Z",
+  speech: "M4 8 H36 V26 H18 L10 34 V26 H4 Z",
+  fire: "M20 2 C26 12 34 16 30 28 C28 36 12 38 10 26 C9 20 14 16 16 10 C18 16 20 18 22 18 C20 12 18 8 20 2 Z",
 };
 
 const cost = (s: ShapeData) => (s.type === "text" ? s.text.length * CHAR : s.type === "label" ? (s.text.length + (s.note?.length ?? 0)) * CHAR : STROKE);

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
-import { parseBoardScript } from "./board.ts";
+import { parseBoardScript, ICONS, seedFrom, focusBox, W, H } from "./board.ts";
 
 test("parseBoardScript rejects bad scripts", () => {
   assert.ok(parseBoardScript(null).error);
@@ -46,4 +46,28 @@ test("fixtures are valid and lose no shapes", () => {
     assert.ok(script, `${f}: ${error}`);
     script!.steps.forEach((s, i: number) => assert.equal(s.draw.length, raw.steps[i].draw.length, `${f} step ${i + 1} dropped a shape`));
   }
+});
+
+test("keeps an at phrase that appears in say, case-insensitive, capped at 60", () => {
+  const { script } = parseBoardScript({ title: "t", steps: [{ say: "The Nucleus is the boss", draw: [{ type: "circle", x: 1, y: 1, r: 5, at: "nucleus" }] }] });
+  assert.equal(script!.steps[0].draw[0].at, "nucleus");
+});
+test("drops an at phrase that is not in say", () => {
+  const { script } = parseBoardScript({ title: "t", steps: [{ say: "hello", draw: [{ type: "circle", x: 1, y: 1, r: 5, at: "nucleus" }] }] });
+  assert.equal(script!.steps[0].draw[0].at, undefined);
+  assert.equal(script!.steps[0].draw.length, 1);
+});
+test("accepts the new doodle icons", () => {
+  for (const name of ["heart", "speech", "fire"]) assert.ok((ICONS as readonly string[]).includes(name));
+});
+test("seedFrom is deterministic and in range", () => {
+  assert.equal(seedFrom("The cell's group chat"), seedFrom("The cell's group chat"));
+  assert.notEqual(seedFrom("a"), seedFrom("b"));
+  const n = seedFrom("x"); assert.ok(n >= 1 && n <= 9999);
+});
+test("focusBox is at least 60% of the board and clamped", () => {
+  const [x, y, w, h] = focusBox([{ type: "circle", x: 990, y: 690, r: 5 } as any]);
+  assert.ok(w >= 600 && h >= 420);
+  assert.ok(x >= 0 && y >= 0 && x + w <= W && y + h <= H);
+  assert.deepEqual(focusBox([]), [0, 0, W, H]);
 });
