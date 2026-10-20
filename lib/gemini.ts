@@ -1,0 +1,23 @@
+import type { Image } from "./validate.ts";
+
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
+
+// One Gemini vision call: image + prompt in, text out. Throws on non-OK or empty reply.
+export async function geminiText(image: Image, prompt: string, json = false): Promise<string> {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY ?? "" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ inline_data: { mime_type: image.mediaType, data: image.data } }, { text: prompt }] }],
+        ...(json ? { generationConfig: { responseMimeType: "application/json" } } : {}),
+      }),
+    },
+  );
+  if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
+  const data = await res.json();
+  const text = (data.candidates?.[0]?.content?.parts ?? []).map((p: { text?: string }) => p.text ?? "").join("").trim();
+  if (!text) throw new Error("Gemini returned an empty reply.");
+  return text;
+}
