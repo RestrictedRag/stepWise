@@ -40,7 +40,7 @@ export default function Player({ script, autoplay = false, bare = false }: { scr
   }, [playing, i, last, steps, voice, heard]);
 
   const go = (n: number) => { setPlaying(false); setI(n); setRun((r) => r + 1); };
-  const board = <Board steps={steps} current={i} run={run} title={script.title} />;
+  const board = <Board steps={steps} current={i} run={run} title={script.title} subtitle={script.subtitle} />;
 
   return (
     <div className="player">

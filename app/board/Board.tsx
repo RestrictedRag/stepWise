@@ -35,8 +35,10 @@ function Bleed({ at, color, delay, done }: { at: [number, number]; color: Color;
   return <motion.circle cx={at[0]} cy={at[1]} r={3} style={{ fill: `var(--c-${color})` }} initial={done ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: delay + STROKE - 0.1, duration: 0.15 }} />;
 }
 
-// shortcut: end point = last coordinate pair in the path string (wrong if it ends in H/V), fine for model doodles; switch to getPointAtLength if dots land off the stroke
+// shortcut: last coordinate pair, wrong for paths ending in H/V/Z; parse commands if dots look off
 const pathEnd = (d: string): [number, number] => { const n = d.match(/-?\d+(?:\.\d+)?/g)!.map(Number); return [n[n.length - 2], n[n.length - 1]]; };
+// Where each icon's stroke finishes (closed shapes end back at their start), in the 40x40 icon box.
+const ICON_END: Record<Icon, [number, number]> = { crown: [4, 30], bolt: [23, 2], star: [20, 3], check: [35, 8], cross: [8, 32], heart: [20, 34], speech: [4, 8], fire: [20, 2] };
 
 function Shape({ s, delay, done }: { s: ShapeData; delay: number; done: boolean }) {
   const stroke = { stroke: `var(--c-${s.color})`, animationDelay: `${delay}s`, animationTimingFunction: "ease-in-out" };
@@ -58,7 +60,7 @@ function Shape({ s, delay, done }: { s: ShapeData; delay: number; done: boolean 
     case "rect": return <g><rect {...p} x={s.x} y={s.y} width={s.w} height={s.h} />{dot([s.x, s.y])}</g>;
     case "path": return <g><path {...p} d={s.d} />{dot(pathEnd(s.d))}</g>;
     case "icon": {
-      const [ex, ey] = pathEnd(ICON_PATHS[s.name]);
+      const [ex, ey] = ICON_END[s.name];
       return <g><path {...p} d={ICON_PATHS[s.name]} transform={`translate(${s.x - 20} ${s.y - 20})`} />{dot([s.x - 20 + ex, s.y - 20 + ey])}</g>;
     }
     case "text": return <Typed x={s.x} y={s.y} text={s.text} size={s.size} color={s.color} delay={delay} />;
@@ -80,6 +82,7 @@ export default function Board({ steps, current, run, title, subtitle, delays }: 
   const lead = current === 0 && run === first ? INTRO : 0; // title card plays only on first mount
   const box = steps[current] ? focusBox(steps[current].draw) : [0, 0, W, H];
   return (
+    <div style={{ position: "relative" }}>
     <motion.svg className="board" initial={{ viewBox: `0 0 ${W} ${H}` }} animate={{ viewBox: box.join(" ") }}
       transition={{ duration: 1.2, ease: "easeInOut", delay: lead }} role="img" aria-label={`Whiteboard: ${title}`}>
       <defs>
@@ -90,11 +93,11 @@ export default function Board({ steps, current, run, title, subtitle, delays }: 
       </defs>
       {steps.slice(0, current + 1).map((step, i) => {
         let t = i === current ? lead : 0;
-        const ink: ReactNode[] = [], words: ReactNode[] = []; // wobble the strokes once per step, never the text
+        const ink: ReactNode[] = [], words: ReactNode[] = []; // wobble the strokes once per step; text and multiply-blended highlights stay unfiltered
         step.draw.forEach((s, j) => {
           const delay = i === current && delays?.[j] !== undefined ? delays[j] + lead : t;
           t += cost(s);
-          (s.type === "text" || s.type === "label" ? words : ink).push(<Shape key={j} s={s} delay={delay} done={i < current} />);
+          (s.type === "text" || s.type === "label" || s.type === "highlight" ? words : ink).push(<Shape key={j} s={s} delay={delay} done={i < current} />);
         });
         return (
           <g key={i === current ? `${i}-${run}` : i} className={i < current ? "done" : undefined}>
@@ -104,12 +107,19 @@ export default function Board({ steps, current, run, title, subtitle, delays }: 
         );
       })}
       {lead > 0 && (
-        <motion.g initial={{ y: 0, scale: 1 }} animate={{ y: -300, scale: 0.4 }} transition={{ delay: INTRO - 0.8, duration: 0.8, ease: "easeInOut" }}
-          style={{ pointerEvents: "none", transformBox: "view-box", transformOrigin: `${W / 2}px ${H / 2}px` }}>
+        <motion.g initial={{ opacity: 1 }} animate={{ opacity: 0 }} transition={{ delay: INTRO - 0.8, duration: 0.8, ease: "easeInOut" }}
+          style={{ pointerEvents: "none" }}>
           <Typed x={W / 2} y={H / 2 - 10} text={title} size={64} color="ink" delay={0} dur={subtitle ? 1 : 1.5} bold />
           {subtitle && <Typed x={W / 2} y={H / 2 + 50} text={subtitle} size={34} color="purple" delay={1} dur={0.5} />}
         </motion.g>
       )}
     </motion.svg>
+    {/* HTML heading so it survives every step, replay and camera move */}
+    <motion.div initial={{ opacity: lead ? 0 : 1 }} animate={{ opacity: 1 }} transition={{ delay: lead ? INTRO - 0.8 : 0, duration: 0.8 }}
+      style={{ position: "absolute", top: 6, left: 0, right: 0, textAlign: "center", pointerEvents: "none", fontFamily: "var(--hand)", lineHeight: 1.1, color: "var(--c-ink)" }}>
+      <div style={{ fontSize: "1.4rem", fontWeight: 700 }}>{title}</div>
+      {subtitle && <div style={{ fontSize: "1rem", color: "var(--c-purple)" }}>{subtitle}</div>}
+    </motion.div>
+    </div>
   );
 }
