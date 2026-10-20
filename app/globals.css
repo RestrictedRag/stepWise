@@ -173,8 +173,10 @@ a { color: inherit; }
 .preview { max-height: 200px; max-width: calc(100% - 32px); margin: 0 16px 8px; border-radius: 10px; border: 1px solid var(--line); }
 .answer { display: grid; gap: 12px; padding-bottom: 64px; }
 .answer .block { white-space: pre-wrap; background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 12px; padding: 16px 20px; margin: 0; }
-.answer .final { border-left-color: var(--hi-ink); background: var(--hi); font-weight: 700; color: #241c2f; }
-.answer .final mark { background: none; color: #4c6af1; font-weight: 900; }
+.answer .final { border-left-color: var(--hi-ink); background: var(--hi); font-weight: 700; color: var(--fg); }
+.answer .final mark { background: none; color: var(--accent); font-weight: 900; }
+.answer .katex { font-size: 1.1em; }
+.answer .katex-display { margin: .5em 0; overflow-x: auto; overflow-y: hidden; }
 [role=alert] { color: #d23b3b; margin: 0; padding: 0 16px 8px; }
 .lesson-head { padding-block: 24px 12px; }
 .lesson-head h2 { font-size: 1.6rem; }

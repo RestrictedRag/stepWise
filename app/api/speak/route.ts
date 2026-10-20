@@ -4,7 +4,8 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const text = typeof body?.text === "string" ? body.text.trim() : "";
   if (!text || text.length > 600) return Response.json({ error: "Text must be 1-600 characters." }, { status: 400 });
-  const key = process.env.EVON_API_KEY; // the Gnani key, shared with Evon
+  // shortcut: EVON_API_KEY is the old name, drop the fallback once .env.local says GNANI_API_KEY.
+  const key = process.env.GNANI_API_KEY || process.env.EVON_API_KEY;
   if (!key) return Response.json({ error: "Voice is not configured." }, { status: 503 });
 
   const res = await fetch("https://api.vachana.ai/api/v1/tts/inference", {

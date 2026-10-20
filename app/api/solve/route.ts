@@ -1,6 +1,6 @@
 import { parseSolveRequest, type Image } from "../../../lib/validate";
 import { takeDeltas } from "../../../lib/sse";
-import { evonChat } from "../../../lib/evon";
+import { llmChat } from "../../../lib/llm";
 
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
 
@@ -9,7 +9,7 @@ const SYSTEM =
   "Number each step, explain why it works, and finish with a line starting 'Answer:'. " +
   "If the question is unclear, say what you can read and ask for clarification.";
 
-// Evon is text-only, so Gemini Flash turns the photo into text first.
+// The Groq model is text-only, so Gemini Flash turns the photo into text first.
 async function readPhoto(image: Image) {
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
 
   let upstream: Response;
   try {
-    upstream = await evonChat([
+    upstream = await llmChat([
       { role: "system", content: SYSTEM },
       { role: "user", content: question },
     ], { stream: true });

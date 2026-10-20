@@ -1,6 +1,6 @@
 import { parseBoardScript, type BoardScript } from "./board.ts";
 import { lessonSystem } from "./prompts.ts";
-import type { Msg } from "./evon.ts";
+import type { Msg } from "./llm.ts";
 import type { LessonRequest } from "./validate.ts";
 import cell from "./fixtures/cell.json" with { type: "json" };
 import waterCycle from "./fixtures/water-cycle.json" with { type: "json" };
@@ -31,7 +31,7 @@ function tryParse(text: string): { script: BoardScript } | { error: string } {
   }
 }
 
-// Ask Evon for a board script; one repair round on bad output, then a fixture or text-only fallback.
+// Ask the LLM for a board script; one repair round on bad output, then a fixture or text-only fallback.
 export async function generateLesson(req: LessonRequest, ask: (m: Msg[]) => Promise<string>): Promise<{ script: BoardScript; fallback: boolean }> {
   const messages: Msg[] = [
     { role: "system", content: lessonSystem(req) },
