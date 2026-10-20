@@ -1,6 +1,6 @@
 import { W, H, type Shape as ShapeData, type Step, type Color, type Icon } from "../../lib/board";
 
-const STROKE = 0.6, CHAR = 0.035; // seconds per stroke / per typed character
+const STROKE = 0.35, CHAR = 0.02; // seconds per stroke / per typed character
 
 const ICON_PATHS: Record<Icon, string> = {
   crown: "M4 30 L8 10 L16 20 L20 6 L24 20 L32 10 L36 30 Z",
@@ -16,10 +16,9 @@ export const stepSeconds = (step: Step) => step.draw.reduce((t, s) => t + cost(s
 
 function Typed({ x, y, text, size, color, delay, bold }: { x: number; y: number; text: string; size: number; color: Color; delay: number; bold?: boolean }) {
   return (
-    <text className="t" x={x} y={y} fontSize={size} fontWeight={bold ? 700 : 400} style={{ fill: `var(--c-${color})` }}>
-      {[...text].map((ch, i) => (
-        <tspan key={i} style={{ animationDelay: `${delay + i * CHAR}s` }}>{ch}</tspan>
-      ))}
+    <text className="t" x={x} y={y} fontSize={size} fontWeight={bold ? 700 : 400}
+      style={{ fill: `var(--c-${color})`, animationDelay: `${delay}s`, animationDuration: `${text.length * CHAR}s`, animationTimingFunction: `steps(${text.length})` }}>
+      {text}
     </text>
   );
 }

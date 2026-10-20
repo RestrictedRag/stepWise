@@ -15,7 +15,7 @@ export default function Player({ script, autoplay = false, bare = false }: { scr
     if (!playing) return;
     if (i >= last) { setPlaying(false); return; }
     // shortcut: fixed reading pace for the caption, replace with TTS end events in Phase 2.
-    const ms = (stepSeconds(steps[i]) + 1.2 + steps[i].say.length * 0.03) * 1000;
+    const ms = (stepSeconds(steps[i]) + 0.5 + steps[i].say.length * 0.012) * 1000;
     const id = setTimeout(() => setI(i + 1), ms);
     return () => clearTimeout(id);
   }, [playing, i, last, steps]);
