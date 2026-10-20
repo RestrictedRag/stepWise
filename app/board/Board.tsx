@@ -1,5 +1,9 @@
-import { W, H, type Shape as ShapeData, type Step, type Color, type Icon } from "../../lib/board";
+"use client";
+import { useId, useRef } from "react";
+import { motion } from "framer-motion";
+import { W, H, seedFrom, focusBox, type Shape as ShapeData, type Step, type Color, type Icon } from "../../lib/board";
 
+const INTRO = 1.5; // seconds the title card holds before step 0 starts
 const STROKE = 0.35, CHAR = 0.02; // seconds per stroke / per typed character
 
 const ICON_PATHS: Record<Icon, string> = {
@@ -17,29 +21,38 @@ const cost = (s: ShapeData) => (s.type === "text" ? s.text.length * CHAR : s.typ
 // Total seconds a step takes to draw, used by the player to pace autoplay.
 export const stepSeconds = (step: Step) => step.draw.reduce((t, s) => t + cost(s), 0);
 
-function Typed({ x, y, text, size, color, delay, bold }: { x: number; y: number; text: string; size: number; color: Color; delay: number; bold?: boolean }) {
+function Typed({ x, y, text, size, color, delay, bold, rotate = 0 }: { x: number; y: number; text: string; size: number; color: Color; delay: number; bold?: boolean; rotate?: number }) {
   return (
-    <text className="t" x={x} y={y} fontSize={size} fontWeight={bold ? 700 : 400}
+    <text className="t" x={x} y={y} fontSize={size} transform={rotate ? `rotate(${rotate} ${x} ${y})` : undefined} fontWeight={bold ? 700 : 400}
       style={{ fill: `var(--c-${color})`, animationDelay: `${delay}s`, animationDuration: `${text.length * CHAR}s`, animationTimingFunction: `steps(${text.length})` }}>
       {text}
     </text>
   );
 }
 
-function Shape({ s, delay }: { s: ShapeData; delay: number }) {
-  const stroke = { stroke: `var(--c-${s.color})`, animationDelay: `${delay}s` };
+// Small filled dot where a stroke ends, fading in as the draw finishes (ink bleed).
+function Bleed({ at, color, delay, done }: { at: [number, number]; color: Color; delay: number; done: boolean }) {
+  return <motion.circle cx={at[0]} cy={at[1]} r={3} style={{ fill: `var(--c-${color})` }} initial={done ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: delay + STROKE - 0.1, duration: 0.15 }} />;
+}
+
+function Shape({ s, delay, done, wobble }: { s: ShapeData; delay: number; done: boolean; wobble: string }) {
+  const stroke = { stroke: `var(--c-${s.color})`, animationDelay: `${delay}s`, animationTimingFunction: "ease-in-out", filter: `url(#${wobble})` };
   const p = { className: "s", pathLength: 1, style: stroke };
+  const dot = (at: [number, number]) => <Bleed at={at} color={s.color} delay={delay} done={done} />;
   switch (s.type) {
-    case "line": return <line {...p} x1={s.from[0]} y1={s.from[1]} x2={s.to[0]} y2={s.to[1]} />;
-    case "highlight": return <line {...p} className="s hl" x1={s.from[0]} y1={s.from[1]} x2={s.to[0]} y2={s.to[1]} />;
+    case "line": return <g><line {...p} x1={s.from[0]} y1={s.from[1]} x2={s.to[0]} y2={s.to[1]} />{dot(s.to)}</g>;
+    case "highlight": {
+      const [a, b] = s.from[0] <= s.to[0] ? [s.from, s.to] : [s.to, s.from]; // always sweeps left to right
+      return <line {...p} className="s hl" style={{ ...stroke, mixBlendMode: "multiply" }} x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} />;
+    }
     case "arrow": {
       const [x1, y1] = s.from, [x2, y2] = s.to, a = Math.atan2(y2 - y1, x2 - x1);
       const head = (d: number) => `${x2 - 18 * Math.cos(a + d)} ${y2 - 18 * Math.sin(a + d)}`;
-      return <path {...p} d={`M${x1} ${y1} L${x2} ${y2} M${head(0.5)} L${x2} ${y2} L${head(-0.5)}`} />;
+      return <g><path {...p} d={`M${x1} ${y1} L${x2} ${y2} M${head(0.5)} L${x2} ${y2} L${head(-0.5)}`} />{dot(s.to)}</g>;
     }
-    case "circle": return <circle {...p} cx={s.x} cy={s.y} r={s.r} />;
-    case "ellipse": return <ellipse {...p} cx={s.x} cy={s.y} rx={s.rx} ry={s.ry} />;
-    case "rect": return <rect {...p} x={s.x} y={s.y} width={s.w} height={s.h} />;
+    case "circle": return <g><circle {...p} cx={s.x} cy={s.y} r={s.r} />{dot([s.x + s.r, s.y])}</g>;
+    case "ellipse": return <g><ellipse {...p} cx={s.x} cy={s.y} rx={s.rx} ry={s.ry} />{dot([s.x + s.rx, s.y])}</g>;
+    case "rect": return <g><rect {...p} x={s.x} y={s.y} width={s.w} height={s.h} />{dot([s.x, s.y])}</g>;
     case "path": return <path {...p} d={s.d} />;
     case "icon": return <path {...p} d={ICON_PATHS[s.name]} transform={`translate(${s.x - 20} ${s.y - 20})`} />;
     case "text": return <Typed x={s.x} y={s.y} text={s.text} size={s.size} color={s.color} delay={delay} />;
@@ -47,28 +60,45 @@ function Shape({ s, delay }: { s: ShapeData; delay: number }) {
       return (
         <g>
           <Typed x={s.x} y={s.y} text={s.text} size={32} color={s.color} delay={delay} bold />
-          {s.note && <Typed x={s.x} y={s.y + 30} text={s.note} size={24} color="ink" delay={delay + s.text.length * CHAR} />}
+          {s.note && <Typed x={s.x} y={s.y + 30} text={s.note} size={22} color={s.color === "orange" ? "purple" : "orange"} rotate={-2} delay={delay + s.text.length * CHAR} />}
         </g>
       );
   }
 }
 
 // Draws steps[0..current]; only the current step animates, earlier ones appear finished.
-export default function Board({ steps, current, run, title }: { steps: Step[]; current: number; run: number; title: string }) {
+// delays (optional) replaces the cumulative-cost delay of the current step's shapes, index-aligned with its draw list.
+export default function Board({ steps, current, run, title, subtitle, delays }: { steps: Step[]; current: number; run: number; title: string; subtitle?: string | null; delays?: number[] }) {
+  const wobble = `wob${useId().replace(/:/g, "")}`;
+  const first = useRef(run).current;
+  const lead = current === 0 && run === first ? INTRO : 0; // title card plays only on first mount
   return (
-    <svg className="board" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Whiteboard: ${title}`}>
+    <motion.svg className="board" initial={{ viewBox: `0 0 ${W} ${H}` }} animate={{ viewBox: focusBox(steps[current].draw).join(" ") }}
+      transition={{ duration: 1.2, ease: "easeInOut", delay: lead }} role="img" aria-label={`Whiteboard: ${title}`}>
+      <defs>
+        <filter id={wobble} filterUnits="userSpaceOnUse" x={0} y={0} width={W} height={H}>
+          <feTurbulence type="fractalNoise" baseFrequency={0.02} numOctaves={2} seed={seedFrom(title)} result="n" />
+          <feDisplacementMap in="SourceGraphic" in2="n" scale={2} />
+        </filter>
+      </defs>
       {steps.slice(0, current + 1).map((step, i) => {
-        let t = 0;
+        let t = i === current ? lead : 0;
         return (
           <g key={i === current ? `${i}-${run}` : i} className={i < current ? "done" : undefined}>
             {step.draw.map((s, j) => {
-              const delay = t;
+              const delay = i === current && delays?.[j] !== undefined ? delays[j] + lead : t;
               t += cost(s);
-              return <Shape key={j} s={s} delay={delay} />;
+              return <Shape key={j} s={s} delay={delay} done={i < current} wobble={wobble} />;
             })}
           </g>
         );
       })}
-    </svg>
+      {lead > 0 && (
+        <motion.g initial={{ opacity: 1 }} animate={{ opacity: 0 }} transition={{ delay: INTRO, duration: 0.6, ease: "easeInOut" }} style={{ pointerEvents: "none" }}>
+          <Typed x={W / 2} y={H / 2 - 10} text={title} size={64} color="ink" delay={0} bold />
+          {subtitle && <Typed x={W / 2} y={H / 2 + 50} text={subtitle} size={34} color="purple" delay={title.length * CHAR} />}
+        </motion.g>
+      )}
+    </motion.svg>
   );
 }
