@@ -1,0 +1,155 @@
+<style>
+  .lay{display:grid;gap:6px;height:230px;background:#0f1115;border-radius:10px;padding:8px;font:11px system-ui;color:#cbd5e1}
+  .pane{border-radius:7px;padding:8px;position:relative;overflow:hidden}
+  .pdf{background:#f8fafc;color:#334155}
+  .pdf .ln{height:5px;background:#cbd5e1;border-radius:3px;margin:5px 0}
+  .pdf .hl{background:#fde68a;outline:2px solid #f59e0b}
+  .brd{background:radial-gradient(circle at 30% 20%,#1e293b,#0b1020);color:#e2e8f0}
+  .ask{background:#1f2937;display:flex;align-items:center;gap:6px}
+  .ask i{flex:1;height:14px;background:#374151;border-radius:8px}
+  .mic{width:16px;height:16px;border-radius:50%;background:#f43f5e}
+  .ses{background:#111827}
+  .ses div{height:14px;background:#1f2937;border-radius:4px;margin:4px 0}
+  .tag{position:absolute;top:6px;left:8px;font-size:10px;opacity:.7;letter-spacing:.05em;text-transform:uppercase}
+  .stage{display:grid;grid-template-columns:1.4fr 1fr;gap:18px;align-items:start;margin-top:10px}
+  .boardDemo{background:radial-gradient(ellipse at 20% 0%,#1d2a4a 0%,#070b16 70%);border-radius:16px;padding:0;overflow:hidden;box-shadow:0 30px 80px -20px rgba(56,189,248,.35),inset 0 0 0 1px rgba(255,255,255,.06)}
+  .boardDemo svg{display:block;width:100%;height:auto}
+  .cap{padding:14px 18px 18px;color:#e2e8f0;font:15px/1.5 Georgia,serif;min-height:68px;border-top:1px solid rgba(255,255,255,.06);background:rgba(0,0,0,.25)}
+  .cap b{color:#fbbf24;font-weight:600}
+  .wave{display:flex;gap:3px;align-items:end;height:16px;padding:0 18px 12px;background:rgba(0,0,0,.25)}
+  .wave span{width:3px;background:#38bdf8;border-radius:2px;animation:w 1s ease-in-out infinite}
+  @keyframes w{0%,100%{height:3px}50%{height:15px}}
+  .ctrl{background:var(--bg-secondary,#f1f5f9);border-radius:14px;padding:16px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 12px}
+  .chip{border:1px solid #cbd5e1;border-radius:999px;padding:5px 11px;font-size:13px;cursor:pointer;background:#fff;color:#0f172a}
+  .chip.on{background:#0f172a;color:#fff;border-color:#0f172a}
+  .free{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:10px;padding:9px;font-size:13px}
+  .row{display:flex;justify-content:space-between;font-size:12px;margin-top:10px;color:#475569}
+  /* animation timeline, 12s loop */
+  .sun{animation:sun 12s infinite}
+  @keyframes sun{0%{opacity:0;transform:scale(.6)}6%{opacity:1;transform:scale(1)}100%{opacity:1}}
+  .ray{stroke-dasharray:60;stroke-dashoffset:60;animation:ray 12s infinite}
+  @keyframes ray{0%,6%{stroke-dashoffset:60}16%,100%{stroke-dashoffset:0}}
+  .leaf{transform-origin:330px 200px;animation:leaf 12s infinite}
+  @keyframes leaf{0%,10%{opacity:0;transform:scale(.3) rotate(-20deg)}20%,100%{opacity:1;transform:scale(1) rotate(0)}}
+  .co2{animation:co2 12s infinite;opacity:0}
+  @keyframes co2{0%,25%{opacity:0;transform:translate(-120px,0)}35%{opacity:1}48%{opacity:1;transform:translate(0,0)}52%,100%{opacity:0;transform:translate(10px,0)}}
+  .h2o{animation:h2o 12s infinite;opacity:0}
+  @keyframes h2o{0%,30%{opacity:0;transform:translate(0,90px)}40%{opacity:1}52%{opacity:1;transform:translate(0,0)}56%,100%{opacity:0}}
+  .glu{animation:glu 12s infinite;opacity:0;transform-origin:330px 200px}
+  @keyframes glu{0%,55%{opacity:0;transform:scale(.2)}63%{opacity:1;transform:scale(1.15)}68%,100%{opacity:1;transform:scale(1)}}
+  .o2{animation:o2 12s infinite;opacity:0}
+  @keyframes o2{0%,66%{opacity:0;transform:translate(0,0)}72%{opacity:1}92%{opacity:1;transform:translate(110px,-80px)}100%{opacity:0;transform:translate(130px,-95px)}}
+  .eq{stroke-dasharray:400;stroke-dashoffset:400;animation:eq 12s infinite}
+  @keyframes eq{0%,74%{stroke-dashoffset:400;opacity:0}75%{opacity:1}90%,100%{stroke-dashoffset:0;opacity:1}}
+  .glow{animation:glow 12s infinite}
+  @keyframes glow{0%,55%{opacity:0}63%{opacity:.9}100%{opacity:.35}}
+</style>
+
+<h2>PDF section — where things live</h2>
+<p class="subtitle">Three ways to arrange the PDF, the ask box, the board and the saved sessions. Click the one that feels right.</p>
+
+<div class="options">
+  <div class="option" data-choice="side" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Side by side</h3>
+      <p>PDF on the left, board on the right, always both visible. Sessions in a thin rail. Feels like a study desk.</p>
+      <div class="lay" style="grid-template-columns:60px 1fr 1.3fr;grid-template-rows:1fr 34px">
+        <div class="pane ses" style="grid-row:span 2"><span class="tag">Saved</span><br><div></div><div></div><div></div></div>
+        <div class="pane pdf"><span class="tag">PDF p.4</span><br><div class="ln"></div><div class="ln"></div><div class="ln hl"></div><div class="ln"></div><div class="ln"></div></div>
+        <div class="pane brd"><span class="tag">Board</span></div>
+        <div class="pane ask" style="grid-column:span 2"><i></i><div class="mic"></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="option" data-choice="theater" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Theater mode</h3>
+      <p>Read the PDF full width. When you ask, the board takes over the screen like a movie; the page shrinks to a corner thumbnail showing the highlighted line. Best for the demo moment.</p>
+      <div class="lay" style="grid-template-rows:1fr 34px">
+        <div class="pane brd"><span class="tag">Board — fullscreen</span>
+          <div class="pane pdf" style="position:absolute;right:8px;bottom:8px;width:70px;height:60px;padding:4px"><div class="ln"></div><div class="ln hl"></div><div class="ln"></div></div>
+        </div>
+        <div class="pane ask"><i></i><div class="mic"></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="option" data-choice="drawer" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Board drawer</h3>
+      <p>PDF stays on top; the board slides up from the bottom and can be dragged taller. Works best on phones.</p>
+      <div class="lay" style="grid-template-rows:1fr 1.2fr 34px">
+        <div class="pane pdf"><span class="tag">PDF</span><br><div class="ln hl"></div><div class="ln"></div></div>
+        <div class="pane brd"><span class="tag">Board ↑</span></div>
+        <div class="pane ask"><i></i><div class="mic"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2 style="margin-top:36px">The demo moment — same lesson, different narrator</h2>
+<p class="subtitle">A rough feel of the polish bar: everything draws itself, glows, and moves in time with the voice. Click a style — only the narration changes, the animation stays.</p>
+
+<div class="stage">
+  <div class="boardDemo">
+    <svg viewBox="0 0 640 360">
+      <defs>
+        <radialGradient id="sg"><stop offset="0" stop-color="#fde68a"/><stop offset="1" stop-color="#f59e0b" stop-opacity="0"/></radialGradient>
+        <linearGradient id="lg" x1="0" x2="1"><stop offset="0" stop-color="#4ade80"/><stop offset="1" stop-color="#15803d"/></linearGradient>
+        <filter id="bl"><feGaussianBlur stdDeviation="6"/></filter>
+      </defs>
+      <g class="sun"><circle cx="90" cy="70" r="70" fill="url(#sg)"/><circle cx="90" cy="70" r="26" fill="#fcd34d"/></g>
+      <g stroke="#fde68a" stroke-width="2.5" stroke-linecap="round" fill="none">
+        <path class="ray" d="M125 95 L280 175"/><path class="ray" d="M115 110 L270 200" style="animation-delay:.15s"/><path class="ray" d="M130 80 L290 150" style="animation-delay:.3s"/>
+      </g>
+      <g class="leaf">
+        <path d="M250 210 Q330 90 420 190 Q330 290 250 210Z" fill="url(#lg)"/>
+        <path d="M255 210 Q335 195 415 192" stroke="#bbf7d0" stroke-width="2" fill="none"/>
+      </g>
+      <g class="co2" style="font:600 15px system-ui" fill="#94a3b8"><circle cx="230" cy="150" r="16" fill="#334155"/><text x="215" y="155" fill="#e2e8f0">CO₂</text></g>
+      <g class="h2o" style="font:600 15px system-ui"><circle cx="320" cy="265" r="16" fill="#0c4a6e"/><text x="304" y="270" fill="#7dd3fc">H₂O</text></g>
+      <circle class="glow" cx="335" cy="200" r="40" fill="#fbbf24" filter="url(#bl)"/>
+      <g class="glu" style="font:700 14px system-ui"><rect x="296" y="186" width="80" height="28" rx="14" fill="#fbbf24"/><text x="308" y="205" fill="#422006">glucose</text></g>
+      <g class="o2" style="font:600 14px system-ui"><circle cx="420" cy="170" r="15" fill="#155e75"/><text x="408" y="175" fill="#a5f3fc">O₂</text></g>
+      <path class="eq" d="M120 330 L520 330" stroke="#38bdf8" stroke-width="2"/>
+      <text x="120" y="322" style="font:16px Georgia" fill="#e2e8f0" class="glow">6CO₂ + 6H₂O + light → C₆H₁₂O₆ + 6O₂</text>
+    </svg>
+    <div class="cap" id="cap"></div>
+    <div class="wave"><span></span><span style="animation-delay:.1s"></span><span style="animation-delay:.25s"></span><span style="animation-delay:.05s"></span><span style="animation-delay:.3s"></span><span style="animation-delay:.18s"></span><span style="animation-delay:.4s"></span></div>
+  </div>
+
+  <div class="ctrl">
+    <div class="label">Explain it…</div>
+    <div class="chips" id="chips">
+      <span class="chip on" data-s="teacher">Like a teacher</span>
+      <span class="chip" data-s="five">Like I'm 5</span>
+      <span class="chip" data-s="gossip">Like gossip</span>
+      <span class="chip" data-s="sports">Sports commentator</span>
+      <span class="chip" data-s="exam">Exam cram</span>
+    </div>
+    <input class="free" placeholder="…or type anything: “like a Bollywood villain”, “in Hinglish”, “as a rap”">
+    <div class="row"><span>Voice: Vachana · warm female</span><span>Speed 1.0×</span></div>
+    <div class="row"><span>Language: English</span><span>Saved with this PDF ✓</span></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const lines={
+    teacher:["The leaf captures <b>light energy</b> from the sun.","It pulls in <b>carbon dioxide</b> from the air and <b>water</b> from the roots.","Inside the chloroplast these combine into <b>glucose</b> — stored food.","And <b>oxygen</b> is released as a by-product. That's photosynthesis."],
+    five:["The sun gives the leaf a big warm <b>hug</b> of light!","The leaf breathes in air and drinks <b>water</b> through its straws — the roots.","Then it bakes a tiny <b>sugar cookie</b> for itself. Yum!","And it breathes out fresh air for <b>us</b>. Thank you, leaf!"],
+    gossip:["Okay so the sun shows up, totally <b>glowing</b>, and the leaf is <i>obsessed</i>.","Then CO₂ and H₂O just <b>walk in together</b>. Like, together together.","Next thing you know — they've made <b>glucose</b>. I'm not saying anything…","And oxygen? <b>Kicked out.</b> Left the leaf. Iconic exit."],
+    sports:["And the SUN fires a beam — <b>right into the leaf!</b>","CO₂ coming in from the left, H₂O up the middle — <b>what a play!</b>","They combine — it's GLUCOSE! <b>GOOOAL!</b>","Oxygen released to the crowd — <b>the stadium goes wild!</b>"],
+    exam:["Light energy absorbed by <b>chlorophyll</b>.","Reactants: <b>6CO₂ + 6H₂O</b>.","Product: <b>C₆H₁₂O₆</b> (glucose).","By-product: <b>6O₂</b>. Write the balanced equation — 2 marks."]
+  };
+  const at=[0,3,6.6,8];let s='teacher',t0=performance.now(),last=-1;
+  const cap=document.getElementById('cap');
+  document.getElementById('chips').onclick=e=>{const c=e.target.closest('.chip');if(!c)return;
+    document.querySelectorAll('#chips .chip').forEach(x=>x.classList.toggle('on',x===c));s=c.dataset.s;last=-1;};
+  (function tick(){const t=((performance.now()-t0)/1000)%12;let i=0;at.forEach((a,k)=>{if(t>=a)i=k});
+    const key=s+i;if(key!==last){cap.innerHTML=lines[s][i];last=key;}requestAnimationFrame(tick);})();
+})();
+</script>

@@ -1,0 +1,72 @@
+<style>
+  .lay{display:grid;gap:6px;height:260px;background:#0f1115;border-radius:10px;padding:8px;font:11px system-ui;color:#cbd5e1}
+  .pane{border-radius:7px;padding:8px;position:relative;overflow:hidden}
+  .pdf{background:#f8fafc;color:#334155}
+  .pdf .ln{height:5px;background:#cbd5e1;border-radius:3px;margin:6px 0}
+  .pdf .hl{background:#fde68a;outline:2px solid #f59e0b}
+  .brd{background:radial-gradient(circle at 30% 20%,#1e293b,#0b1020);color:#e2e8f0}
+  .ask{background:#1f2937;display:flex;align-items:center;gap:6px}
+  .ask i{flex:1;height:14px;background:#374151;border-radius:8px}
+  .chipx{height:14px;width:44px;background:#334155;border-radius:8px}
+  .mic{width:16px;height:16px;border-radius:50%;background:#f43f5e}
+  .tag{position:absolute;top:6px;left:8px;font-size:10px;opacity:.7;letter-spacing:.05em;text-transform:uppercase}
+  .grip{background:#334155;border-radius:3px;cursor:col-resize}
+  .sesbtn{position:absolute;top:6px;right:8px;font-size:10px;background:#e2e8f0;color:#334155;border-radius:6px;padding:2px 6px}
+  .leaf{position:absolute;left:35%;top:35%;width:70px;height:40px;background:linear-gradient(90deg,#4ade80,#15803d);border-radius:50% 0}
+  .sun{position:absolute;left:12%;top:14%;width:26px;height:26px;border-radius:50%;background:#fcd34d;box-shadow:0 0 30px #f59e0b}
+  .capx{position:absolute;left:8px;right:8px;bottom:8px;height:18px;background:rgba(0,0,0,.35);border-radius:5px}
+</style>
+
+<h2>PDF and board side by side</h2>
+<p class="subtitle">PDF on the left, board on the right, ask bar along the bottom. Three ways to split the space — click one.</p>
+
+<div class="options">
+  <div class="option" data-choice="even" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Even split, draggable</h3>
+      <p>Half and half to start. Drag the middle bar to give either side more room. Saved lessons open from a button on the PDF.</p>
+      <div class="lay" style="grid-template-columns:1fr 6px 1fr;grid-template-rows:1fr 34px">
+        <div class="pane pdf"><span class="tag">PDF p.4</span><span class="sesbtn">Saved ▾</span><br><div class="ln"></div><div class="ln"></div><div class="ln hl"></div><div class="ln"></div><div class="ln"></div><div class="ln"></div></div>
+        <div class="grip"></div>
+        <div class="pane brd"><span class="tag">Board</span><div class="sun"></div><div class="leaf"></div><div class="capx"></div></div>
+        <div class="pane ask" style="grid-column:span 3"><span class="chipx"></span><span class="chipx"></span><span class="chipx"></span><i></i><div class="mic"></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="option" data-choice="board-big" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Board-first</h3>
+      <p>The board gets about two-thirds of the width so the animation is the star. The PDF stays readable on the left and scrolls to the line being explained.</p>
+      <div class="lay" style="grid-template-columns:1fr 6px 2fr;grid-template-rows:1fr 34px">
+        <div class="pane pdf"><span class="tag">PDF</span><span class="sesbtn">Saved ▾</span><br><div class="ln"></div><div class="ln hl"></div><div class="ln"></div><div class="ln"></div></div>
+        <div class="grip"></div>
+        <div class="pane brd"><span class="tag">Board</span><div class="sun"></div><div class="leaf"></div><div class="capx"></div></div>
+        <div class="pane ask" style="grid-column:span 3"><span class="chipx"></span><span class="chipx"></span><span class="chipx"></span><i></i><div class="mic"></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="option" data-choice="shift" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Shifts when you ask</h3>
+      <p>Reading: the PDF is wide and the board is a slim panel. Once you ask a question, it animates to board-wide and PDF-slim. Drag to override.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="lay" style="height:200px;grid-template-columns:2fr 6px 1fr;grid-template-rows:1fr 30px">
+          <div class="pane pdf"><span class="tag">Reading</span><br><div class="ln"></div><div class="ln"></div><div class="ln"></div><div class="ln"></div></div>
+          <div class="grip"></div>
+          <div class="pane brd"></div>
+          <div class="pane ask" style="grid-column:span 3"><i></i><div class="mic"></div></div>
+        </div>
+        <div class="lay" style="height:200px;grid-template-columns:1fr 6px 2.5fr;grid-template-rows:1fr 30px">
+          <div class="pane pdf"><br><div class="ln hl"></div><div class="ln"></div></div>
+          <div class="grip"></div>
+          <div class="pane brd"><span class="tag">Explaining</span><div class="sun"></div><div class="leaf"></div><div class="capx"></div></div>
+          <div class="pane ask" style="grid-column:span 3"><i></i><div class="mic"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<p class="subtitle" style="margin-top:14px">On phones, all three fall back to PDF on top and board below — too narrow for side by side.</p>
