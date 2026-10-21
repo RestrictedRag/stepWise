@@ -184,8 +184,8 @@ a { color: inherit; }
 
 /* Board: hand-drawn whiteboard lessons */
 :root { --c-ink: #22201c; --c-purple: #7a3fd1; --c-orange: #e0761b; --c-green: #2c9a4b; --c-red: #d23b3b; --c-blue: #2867c9; }
-/* cap height so the board, caption and controls fit one screen; viewBox letterboxes the drawing */
-.board { width: 100%; height: auto; max-height: max(240px, calc(100svh - 300px)); display: block; background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+/* as big as fits: full width, or height-capped (heading + caption + controls stay on screen) with the 10:7 width following and centred */
+.board { --bh: max(260px, calc(100svh - 370px)); width: min(100%, calc(var(--bh) * 10 / 7)); aspect-ratio: 10 / 7; height: auto; margin-inline: auto; display: block; background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
 .board .s { fill: none; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw .35s ease-out forwards; }
 .board .hl { stroke-width: 30; stroke-opacity: .3; }
 .board .t { font-family: var(--hand); text-anchor: middle; }

@@ -95,10 +95,15 @@ export function focusBox(shapes: Shape[]): [number, number, number, number] {
     else if (s.type === "circle") pts.push([s.x - s.r, s.y - s.r], [s.x + s.r, s.y + s.r]);
     else if (s.type === "ellipse") pts.push([s.x - s.rx, s.y - s.ry], [s.x + s.rx, s.y + s.ry]);
     else if (s.type === "rect") pts.push([s.x, s.y], [s.x + s.w, s.y + s.h]);
-    else if (s.x !== undefined) pts.push([s.x, s.y]); // text, label, icon anchor
+    else if (s.type === "text" || s.type === "label") {
+      // shortcut: glyph width ~0.55em, not measured; measure text if long labels still clip
+      const size = s.type === "text" ? s.size : 32, half = (s.text.length * size * 0.55) / 2;
+      const noteHalf = s.type === "label" && s.note ? (s.note.length * 22 * 0.55) / 2 : 0;
+      pts.push([s.x - Math.max(half, noteHalf), s.y - size], [s.x + Math.max(half, noteHalf), s.y + (s.type === "label" && s.note ? 40 : size * 0.3)]);
+    } else if (s.x !== undefined) pts.push([s.x - 20, s.y - 20], [s.x + 20, s.y + 20]); // icon
   }
   if (!pts.length) return [0, 0, W, H];
-  const PAD = 40;
+  const PAD = 60;
   const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
   const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
   // Scale unit: 1 unit = 10 px wide, 7 px tall; floor 60 (60% of board), cap 100 (full board).

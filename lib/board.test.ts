@@ -71,3 +71,10 @@ test("focusBox is at least 60% of the board and clamped", () => {
   assert.ok(x >= 0 && y >= 0 && x + w <= W && y + h <= H);
   assert.deepEqual(focusBox([]), [0, 0, W, H]);
 });
+
+test("focusBox keeps wide centred text inside the view", () => {
+  const text = "Pythagorean theorem a^2 + b^2 = c^2";
+  const [x, , w] = focusBox([{ type: "text", x: 500, y: 100, text, size: 30, color: "ink" } as any]);
+  const half = (text.length * 30 * 0.55) / 2;
+  assert.ok(x <= 500 - half && x + w >= 500 + half);
+});

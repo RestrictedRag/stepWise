@@ -82,11 +82,17 @@ export default function Board({ steps, current, run, title, subtitle, delays }: 
   const lead = current === 0 && run === first ? INTRO : 0; // title card plays only on first mount
   const box = steps[current] ? focusBox(steps[current].draw) : [0, 0, W, H];
   return (
-    <div style={{ position: "relative" }}>
+    <div>
+    {/* HTML heading in normal flow above the drawing: survives every step, replay and camera move, never overlaps the model text */}
+    <motion.div initial={{ opacity: lead ? 0 : 1 }} animate={{ opacity: 1 }} transition={{ delay: lead ? INTRO - 0.8 : 0, duration: 0.8 }}
+      style={{ textAlign: "center", marginBottom: 6, fontFamily: "var(--hand)", lineHeight: 1.1, color: "var(--c-ink)" }}>
+      <div style={{ fontSize: "1.4rem", fontWeight: 700 }}>{title}</div>
+      {subtitle && <div style={{ fontSize: "1rem", color: "var(--c-purple)" }}>{subtitle}</div>}
+    </motion.div>
     <motion.svg className="board" initial={{ viewBox: `0 0 ${W} ${H}` }} animate={{ viewBox: box.join(" ") }}
       transition={{ duration: 1.2, ease: "easeInOut", delay: lead }} role="img" aria-label={`Whiteboard: ${title}`}>
       <defs>
-        <filter id={wobble} filterUnits="userSpaceOnUse" x={0} y={0} width={W} height={H}>
+        <filter id={wobble} filterUnits="userSpaceOnUse" x={-W * 0.1} y={-H * 0.1} width={W * 1.2} height={H * 1.2}>
           <feTurbulence type="fractalNoise" baseFrequency={0.02} numOctaves={2} seed={seedFrom(title)} result="n" />
           <feDisplacementMap in="SourceGraphic" in2="n" scale={2} />
         </filter>
@@ -114,12 +120,6 @@ export default function Board({ steps, current, run, title, subtitle, delays }: 
         </motion.g>
       )}
     </motion.svg>
-    {/* HTML heading so it survives every step, replay and camera move */}
-    <motion.div initial={{ opacity: lead ? 0 : 1 }} animate={{ opacity: 1 }} transition={{ delay: lead ? INTRO - 0.8 : 0, duration: 0.8 }}
-      style={{ position: "absolute", top: 6, left: 0, right: 0, textAlign: "center", pointerEvents: "none", fontFamily: "var(--hand)", lineHeight: 1.1, color: "var(--c-ink)" }}>
-      <div style={{ fontSize: "1.4rem", fontWeight: 700 }}>{title}</div>
-      {subtitle && <div style={{ fontSize: "1rem", color: "var(--c-purple)" }}>{subtitle}</div>}
-    </motion.div>
     </div>
   );
 }
