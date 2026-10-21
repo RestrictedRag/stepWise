@@ -47,6 +47,7 @@ export default function PdfStudio() {
   const savedId = useRef(""); // id of the stored lesson on screen; "" until its clips arrive
   const meta = useRef({ question: "", style: "", page: 1, lang: "en" });
   const loadId = useRef(0);
+  const shown = useRef(script); shown.current = script; // an unmounted Player's late clips must not land on the next lesson
 
   // shortcut: storage failures (private mode, blocked IndexedDB) are swallowed so the lesson flow still works, upgrade if users need to know.
   useEffect(() => { listPdfs().then(setRecent).catch(() => {}); }, []);
@@ -60,7 +61,7 @@ export default function PdfStudio() {
     setQuoteMode(false); setError(""); setNotice(""); setLayout("reading");
     try {
       const k = known ?? await pdfKey(bytes);
-      if (!known) await savePdf(k, name, bytes);
+      if (!known) await savePdf(k, name, bytes).catch(() => {}); // lessons and style still load if the PDF can't be stored
       const [st, ls, rc] = await Promise.all([getLastStyle(k), listLessons(k), listPdfs()]);
       if (lid !== loadId.current) return;
       setKey(k); setStyle(st); setLessons(ls); setRecent(rc);
@@ -85,6 +86,7 @@ export default function PdfStudio() {
   }
 
   async function onClips(c: (Blob | null)[]) {
+    if (script !== shown.current) return;
     setClips(c);
     if (!key || !script || savedId.current) return;
     const lesson: Lesson = { id: crypto.randomUUID(), pdfKey: key, ...meta.current, script, clips: c, step: 0, createdAt: Date.now() };
@@ -108,7 +110,7 @@ export default function PdfStudio() {
 
   async function ask(text: string) {
     cancel(); const id = rid.current;
-    setBusy(true); setError("");
+    setBusy(true); setError(""); setNotice("");
     try {
       let q = text;
       if (!quoteMode) {
