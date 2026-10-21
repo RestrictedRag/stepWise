@@ -1,49 +1,100 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Board, { stepSeconds } from "./Board";
 import type { BoardScript } from "../../lib/board";
+import { loadClips } from "../../lib/clips";
+import { shapeDelays } from "../../lib/sync";
+
+const speak = (text: string) =>
+  fetch("/api/speak", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) }).then((r) => (r.ok ? r.blob() : null));
+
+type Props = {
+  script: BoardScript; autoplay?: boolean; bare?: boolean;
+  clips?: (Blob | null)[]; onClips?: (clips: (Blob | null)[]) => void;
+  startStep?: number; onStep?: (i: number) => void;
+  paused?: boolean; // controlled: when defined it overrides the Pause button
+};
 
 // bare: skip the framed stage when a parent (the home hero) already frames the board.
-export default function Player({ script, autoplay = false, bare = false }: { script: BoardScript; autoplay?: boolean; bare?: boolean }) {
+export default function Player({ script, autoplay = false, bare = false, clips, onClips, startStep, onStep, paused }: Props) {
   const { steps } = script;
-  const [i, setI] = useState(0);
-  const [run, setRun] = useState(0); // bump to replay the current step
-  const [playing, setPlaying] = useState(autoplay);
-  const [voice, setVoice] = useState(false); // off by default: browsers block sound before a click
-  const [heard, setHeard] = useState(-1); // step whose narration finished (or failed)
   const last = steps.length - 1;
+  const [i, setI] = useState(Math.min(Math.max(startStep ?? 0, 0), last));
+  const [run, setRun] = useState(0); // bump to replay the current step
+  const [sync, setSync] = useState(0); // bump to redraw the step once its clip length is known
+  const [playing, setPlaying] = useState(autoplay);
+  const [voice, setVoice] = useState(clips !== undefined || onClips !== undefined); // PDF page speaks by default; /board stays muted: browsers block sound before a click
+  const [heard, setHeard] = useState(-1); // step whose narration finished
+  const [textPaced, setTextPaced] = useState(!voice); // no audio for this step: advance at reading pace
+  const [delays, setDelays] = useState<number[] | undefined>();
+  const [pausedState, setPausedState] = useState(false);
+  const isPaused = paused ?? pausedState;
 
-  // Read the current step aloud with Vachana; any failure just marks it heard so play never stalls.
+  const live = useRef({ clips, onClips, onStep }); live.current = { clips, onClips, onStep };
+  const pausedRef = useRef(isPaused); pausedRef.current = isPaused;
+  const clipPs = useRef<Promise<Blob | null>[] | null>(null);
+  const audio = useRef<HTMLAudioElement | null>(null); // the step's Audio lives here so pause doesn't tear it down
+  const left = useRef<number | null>(null); // ms remaining on the advance timer while paused
+
+  // Fetch all clips (or reuse stored ones) once voice is on.
   useEffect(() => {
-    if (!voice) return;
-    setHeard(-1);
-    const a = new Audio();
-    let url = "";
+    if (!voice) { clipPs.current = null; return; }
     let gone = false;
-    const done = () => { if (!gone) setHeard(i); };
-    a.onended = done;
-    fetch("/api/speak", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: steps[i].say }) })
-      .then((r) => (r.ok ? r.blob() : Promise.reject()))
-      .then((b) => { if (gone) return; url = URL.createObjectURL(b); a.src = url; return a.play(); })
-      .catch(done);
-    return () => { gone = true; a.pause(); if (url) URL.revokeObjectURL(url); };
+    const ps = loadClips(steps.map((s) => s.say), speak, live.current.clips);
+    clipPs.current = ps;
+    Promise.all(ps).then((c) => { if (!gone) live.current.onClips?.(c); });
+    return () => { gone = true; };
+  }, [voice, steps]);
+
+  // Start the current step: wait for its clip, then sync the shapes to the clip length and play it.
+  useEffect(() => {
+    left.current = null;
+    setHeard(-1); setDelays(undefined); setTextPaced(!voice);
+    live.current.onStep?.(i);
+    if (!voice) return;
+    let gone = false, url = "";
+    const a = new Audio();
+    audio.current = a;
+    clipPs.current![i].then((b) => {
+      if (gone) return;
+      if (!b) { setTextPaced(true); return; }
+      url = URL.createObjectURL(b);
+      a.onended = () => { if (!gone) setHeard(i); };
+      a.onerror = () => { if (!gone) setTextPaced(true); };
+      a.onloadedmetadata = () => {
+        if (gone) return;
+        const secs = isFinite(a.duration) ? a.duration : stepSeconds(steps[i]);
+        setDelays(shapeDelays(steps[i], secs)); setSync((s) => s + 1);
+        if (!pausedRef.current) a.play().catch(() => setTextPaced(true));
+      };
+      a.src = url;
+    });
+    return () => { gone = true; a.pause(); audio.current = null; if (url) URL.revokeObjectURL(url); };
   }, [voice, i, run, steps]);
 
   useEffect(() => {
-    if (!playing) return;
+    const a = audio.current;
+    if (!a) return;
+    if (isPaused) a.pause();
+    else if (a.readyState >= 1 && !a.ended) a.play().catch(() => {});
+  }, [isPaused]);
+
+  useEffect(() => {
+    if (!playing || isPaused) return;
     if (i >= last) { setPlaying(false); return; }
-    if (voice && heard !== i) return; // wait for the narration to end
-    // muted: fixed reading pace for the caption
-    const ms = voice ? 400 : (stepSeconds(steps[i], i === 0) + 0.5 + steps[i].say.length * 0.012) * 1000;
+    if (!textPaced && heard !== i) return; // wait for the narration to end
+    const ms = left.current ?? (textPaced ? (stepSeconds(steps[i], i === 0) + 0.5 + steps[i].say.length * 0.012) * 1000 : 400);
+    const end = Date.now() + ms;
     const id = setTimeout(() => setI(i + 1), ms);
-    return () => clearTimeout(id);
-  }, [playing, i, last, steps, voice, heard]);
+    return () => { clearTimeout(id); if (pausedRef.current) left.current = Math.max(0, end - Date.now()); };
+  }, [playing, isPaused, i, last, steps, textPaced, heard]);
 
   const go = (n: number) => { setPlaying(false); setI(n); setRun((r) => r + 1); };
-  const board = <Board steps={steps} current={i} run={run} title={script.title} subtitle={script.subtitle} />;
+  // shortcut: in-flight framer moves (<1s) finish while paused, set duration 0 when paused if visible
+  const board = <Board steps={steps} current={i} run={run + sync} title={script.title} subtitle={script.subtitle} delays={delays} />;
 
   return (
-    <div className="player">
+    <div className={isPaused ? "player paused" : "player"}>
       {bare ? board : <div className="board-stage">{board}</div>}
       <div className="progress" aria-hidden="true"><span style={{ width: `${((i + 1) / steps.length) * 100}%` }} /></div>
       <p className="caption" aria-live="polite">{steps[i].say}</p>
@@ -52,7 +103,8 @@ export default function Player({ script, autoplay = false, bare = false }: { scr
         <button className="btn ghost" onClick={() => go(i - 1)} disabled={i === 0}>Back</button>
         <button className="btn ghost" onClick={() => go(0)}>Replay</button>
         <button className="btn ghost" onClick={() => setVoice((v) => !v)} aria-pressed={voice}>{voice ? "Mute" : "Voice"}</button>
-        <button className="btn ghost" onClick={() => setPlaying((p) => !p)} disabled={i === last && !playing}>{playing ? "Pause" : "Play"}</button>
+        <button className="btn ghost" onClick={() => setPausedState((p) => !p)} disabled={paused !== undefined} aria-pressed={isPaused}>{isPaused ? "Resume" : "Pause"}</button>
+        <button className="btn ghost" onClick={() => setPlaying((p) => !p)} disabled={i === last && !playing}>{playing ? "Stop" : "Play"}</button>
         <button className="btn" onClick={() => go(i + 1)} disabled={i === last}>Next</button>
       </div>
     </div>

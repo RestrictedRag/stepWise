@@ -192,6 +192,7 @@ a { color: inherit; }
 /* clip wipe, not per-tspan opacity: Chrome skips repainting <text> when only tspan styles change */
 .board .t { clip-path: inset(-50% 100% -50% 0); animation: type 0s forwards; }
 .board .done * { animation: none; stroke-dashoffset: 0; clip-path: none; }
+.player.paused .board * { animation-play-state: paused; }
 @keyframes draw { to { stroke-dashoffset: 0; } }
 @keyframes type { to { clip-path: inset(-50% -10% -50% 0); } }
 @media (prefers-reduced-motion: reduce) { .board * { animation: none !important; stroke-dashoffset: 0 !important; clip-path: none !important; } }
