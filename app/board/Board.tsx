@@ -31,8 +31,9 @@ function Typed({ x, y, text, size, color, delay, bold, rotate = 0, dur }: { x: n
 }
 
 // Small filled dot where a stroke ends, fading in as the draw finishes (ink bleed).
-function Bleed({ at, color, delay, done }: { at: [number, number]; color: Color; delay: number; done: boolean }) {
-  return <motion.circle cx={at[0]} cy={at[1]} r={3} style={{ fill: `var(--c-${color})` }} initial={done ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: delay + STROKE - 0.1, duration: 0.15 }} />;
+// CSS animation (not framer) so it freezes with the strokes when the player pauses.
+function Bleed({ at, color, delay }: { at: [number, number]; color: Color; delay: number; done?: boolean }) {
+  return <circle className="dot" cx={at[0]} cy={at[1]} r={3} style={{ fill: `var(--c-${color})`, animationDelay: `${delay + STROKE - 0.1}s` }} />;
 }
 
 // shortcut: last coordinate pair, wrong for paths ending in H/V/Z; parse commands if dots look off
@@ -75,11 +76,13 @@ function Shape({ s, delay, done }: { s: ShapeData; delay: number; done: boolean 
 }
 
 // Draws steps[0..current]; only the current step animates, earlier ones appear finished.
+// hold: skip the current step until delays arrive (voice mode); the new key then mounts it fresh.
 // delays (optional) replaces the cumulative-cost delay of the current step's shapes, index-aligned with its draw list.
-export default function Board({ steps, current, run, title, subtitle, delays }: { steps: Step[]; current: number; run: number; title: string; subtitle?: string | null; delays?: number[] }) {
+export default function Board({ steps, current, run, title, subtitle, delays, hold }: { steps: Step[]; current: number; run: number; title: string; subtitle?: string | null; delays?: number[]; hold?: boolean }) {
   const wobble = `wob${useId().replace(/:/g, "")}`;
   const first = useRef(run).current;
-  const lead = current === 0 && run === first ? INTRO : 0; // title card plays only on first mount
+  // title card plays only on first mount; voice mode (delays or hold) has no intro: the audio is already playing and a lead would desync it
+  const lead = current === 0 && run === first && !delays && !hold ? INTRO : 0;
   const box = steps[current] ? focusBox(steps[current].draw) : [0, 0, W, H];
   return (
     <div>
@@ -98,6 +101,7 @@ export default function Board({ steps, current, run, title, subtitle, delays }: 
         </filter>
       </defs>
       {steps.slice(0, current + 1).map((step, i) => {
+        if (hold && i === current) return null; // voice mode: draw only once the clip length (delays) is known
         let t = i === current ? lead : 0;
         const ink: ReactNode[] = [], words: ReactNode[] = []; // wobble the strokes once per step; text and multiply-blended highlights stay unfiltered
         step.draw.forEach((s, j) => {

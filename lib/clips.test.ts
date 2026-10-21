@@ -2,6 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { loadClips } from "./clips.ts";
 
+test("no steps means no clips and no speak calls", () => {
+  assert.deepEqual(loadClips([], () => { throw new Error("called"); }), []);
+});
 test("stored clips never call speak", async () => {
   let calls = 0; const b = new Blob(["a"]);
   const out = await Promise.all(loadClips(["a", "b"], async () => { calls++; return null; }, [b, null]));

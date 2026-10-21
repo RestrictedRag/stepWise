@@ -21,7 +21,6 @@ export default function Player({ script, autoplay = false, bare = false, clips, 
   const last = steps.length - 1;
   const [i, setI] = useState(Math.min(Math.max(startStep ?? 0, 0), last));
   const [run, setRun] = useState(0); // bump to replay the current step
-  const [sync, setSync] = useState(0); // bump to redraw the step once its clip length is known
   const [playing, setPlaying] = useState(autoplay);
   const [voice, setVoice] = useState(clips !== undefined || onClips !== undefined); // PDF page speaks by default; /board stays muted: browsers block sound before a click
   const [heard, setHeard] = useState(-1); // step whose narration finished
@@ -32,30 +31,29 @@ export default function Player({ script, autoplay = false, bare = false, clips, 
 
   const live = useRef({ clips, onClips, onStep }); live.current = { clips, onClips, onStep };
   const pausedRef = useRef(isPaused); pausedRef.current = isPaused;
-  const clipPs = useRef<Promise<Blob | null>[] | null>(null);
+  const clipPs = useRef<{ steps: typeof steps; ps: Promise<Blob | null>[] } | null>(null); // cached per script so Mute/Voice cycles reuse it
+  const lastStep = useRef(-1);
   const audio = useRef<HTMLAudioElement | null>(null); // the step's Audio lives here so pause doesn't tear it down
   const left = useRef<number | null>(null); // ms remaining on the advance timer while paused
 
   // Fetch all clips (or reuse stored ones) once voice is on.
   useEffect(() => {
-    if (!voice) { clipPs.current = null; return; }
-    let gone = false;
+    if (!voice || clipPs.current?.steps === steps) return;
     const ps = loadClips(steps.map((s) => s.say), speak, live.current.clips);
-    clipPs.current = ps;
-    Promise.all(ps).then((c) => { if (!gone) live.current.onClips?.(c); });
-    return () => { gone = true; };
+    clipPs.current = { steps, ps };
+    Promise.all(ps).then((c) => live.current.onClips?.(c));
   }, [voice, steps]);
 
   // Start the current step: wait for its clip, then sync the shapes to the clip length and play it.
   useEffect(() => {
     left.current = null;
     setHeard(-1); setDelays(undefined); setTextPaced(!voice);
-    live.current.onStep?.(i);
+    if (lastStep.current !== i) { lastStep.current = i; live.current.onStep?.(i); }
     if (!voice) return;
     let gone = false, url = "";
     const a = new Audio();
     audio.current = a;
-    clipPs.current![i].then((b) => {
+    clipPs.current!.ps[i].then((b) => {
       if (gone) return;
       if (!b) { setTextPaced(true); return; }
       url = URL.createObjectURL(b);
@@ -64,7 +62,7 @@ export default function Player({ script, autoplay = false, bare = false, clips, 
       a.onloadedmetadata = () => {
         if (gone) return;
         const secs = isFinite(a.duration) ? a.duration : stepSeconds(steps[i]);
-        setDelays(shapeDelays(steps[i], secs)); setSync((s) => s + 1);
+        setDelays(shapeDelays(steps[i], secs));
         if (!pausedRef.current) a.play().catch(() => setTextPaced(true));
       };
       a.src = url;
@@ -91,7 +89,7 @@ export default function Player({ script, autoplay = false, bare = false, clips, 
 
   const go = (n: number) => { setPlaying(false); setI(n); setRun((r) => r + 1); };
   // shortcut: in-flight framer moves (<1s) finish while paused, set duration 0 when paused if visible
-  const board = <Board steps={steps} current={i} run={run + sync} title={script.title} subtitle={script.subtitle} delays={delays} />;
+  const board = <Board steps={steps} current={i} run={run} title={script.title} subtitle={script.subtitle} delays={delays} hold={voice && !textPaced && !delays} />;
 
   return (
     <div className={isPaused ? "player paused" : "player"}>
