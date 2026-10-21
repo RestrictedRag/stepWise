@@ -38,11 +38,11 @@ const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice
 function parseDoubt(d: any): Doubt | undefined {
   const question = str(d?.question, MAX_TOPIC);
   if (!question) return undefined;
-  const titles = Array.isArray(d.titles) ? d.titles.slice(0, 8).map((t: unknown) => str(t, 80)) : [];
+  const titles = Array.isArray(d.titles) ? d.titles.slice(0, 8).map((t: unknown) => str(t, 80)).filter(Boolean) : [];
   return { question, say: str(d.say, 600), titles, ...(str(d.prev, MAX_TOPIC) && { prev: str(d.prev, MAX_TOPIC) }) };
 }
 
-// Returns { topic, persona, level, lang } with defaults filled in, or { error }.
+// Returns { topic, persona, level, lang, style, fromQuestion, doubt? } with defaults filled in, or { error }.
 export function parseLessonRequest(body: any): (LessonRequest & { error?: undefined }) | { error: string } {
   const topic = typeof body?.topic === "string" ? body.topic.trim() : "";
   if (!topic) return { error: "Type a topic to learn." };

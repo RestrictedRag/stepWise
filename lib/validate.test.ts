@@ -38,6 +38,7 @@ test("doubt payload is trimmed, capped and optional", () => {
   assert.equal(r.doubt?.say.length, 600);
   assert.equal(r.doubt?.titles.length, 8);
   assert.equal(r.doubt?.prev, "how?");
+  assert.deepEqual((parseLessonRequest({ topic: "Q3", doubt: { question: "q", titles: [" a ", "  ", ""] } }) as any).doubt.titles, ["a"]);
   assert.equal((parseLessonRequest({ topic: "Q3" }) as any).doubt, undefined);
   assert.equal((parseLessonRequest({ topic: "Q3", doubt: { question: "" } }) as any).doubt, undefined);
 });

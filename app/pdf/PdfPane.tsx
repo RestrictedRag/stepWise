@@ -6,19 +6,21 @@ type Props = {
   file: ArrayBuffer; page: number; onPage: (n: number) => void;
   bbox: [number, number, number, number] | null;
   renderRef: MutableRefObject<(() => Promise<string>) | null>;
+  onReady: (ready: boolean) => void;
 };
 
-export default function PdfPane({ file, page, onPage, bbox, renderRef }: Props) {
+export default function PdfPane({ file, page, onPage, bbox, renderRef, onReady }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const doc = useRef<any>(null);
-  const done = useRef<Promise<void>>(Promise.resolve());
+  const done = useRef<Promise<void>>(Promise.resolve()); // never rejects
+  const ok = useRef(false);
   const [count, setCount] = useState(0);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let dead = false;
     let loading: { destroy: () => Promise<void> } | undefined;
-    setError(""); setCount(0);
+    setError(""); setCount(0); ok.current = false; onReady(false);
     (async () => {
       try {
         const pdfjs = await import("pdfjs-dist");
@@ -40,14 +42,20 @@ export default function PdfPane({ file, page, onPage, bbox, renderRef }: Props) 
     if (!count) return;
     let task: { promise: Promise<void>; cancel: () => void } | undefined;
     let dead = false;
+    const prev = done.current;
     done.current = (async () => {
-      const p = await doc.current.getPage(Math.min(Math.max(page, 1), count));
+      await prev; // the previous render must release the canvas before we reuse it
       if (dead) return;
-      const vp = p.getViewport({ scale: renderScale(p.getViewport({ scale: 1 }).width) });
-      const c = canvas.current!;
-      c.width = vp.width; c.height = vp.height;
-      task = p.render({ canvasContext: c.getContext("2d")!, canvas: c, viewport: vp });
-      await task!.promise.catch(() => {}); // a cancelled render rejects; the next page's render takes over
+      try {
+        const p = await doc.current.getPage(Math.min(Math.max(page, 1), count));
+        if (dead) return;
+        const vp = p.getViewport({ scale: renderScale(p.getViewport({ scale: 1 }).width) });
+        const c = canvas.current!;
+        c.width = vp.width; c.height = vp.height;
+        task = p.render({ canvasContext: c.getContext("2d")!, canvas: c, viewport: vp });
+        await task!.promise;
+        ok.current = true; onReady(true);
+      } catch { /* a cancelled render rejects; the next page's render takes over */ }
     })();
     return () => { dead = true; task?.cancel(); };
   }, [count, page]);
@@ -55,6 +63,7 @@ export default function PdfPane({ file, page, onPage, bbox, renderRef }: Props) 
   useEffect(() => {
     renderRef.current = async () => {
       await done.current;
+      if (!ok.current) throw new Error("page not rendered"); // never send a blank canvas to /api/locate
       return canvas.current!.toDataURL("image/jpeg", 0.85);
     };
     return () => { renderRef.current = null; };

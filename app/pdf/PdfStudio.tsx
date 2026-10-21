@@ -34,27 +34,36 @@ export default function PdfStudio() {
   const [style, setStyle] = useState("");
   const [lang, setLang] = useState<Lang>("en");
   const [question, setQuestion] = useState("");
+  const [ready, setReady] = useState(false);
+  const rid = useRef(0); // request id: a response whose id is stale is ignored
   const renderRef = useRef<(() => Promise<string>) | null>(null);
+
+  function cancel() { rid.current++; setBusy(false); setDoubtBusy(false); }
 
   async function upload(f: File | undefined) {
     if (!f) return;
+    cancel();
     setFile(await f.arrayBuffer());
     setPage(1); setBbox(null); setScript(null); setClips(undefined); setDoubt(null);
     setQuoteMode(false); setError(""); setLayout("reading");
   }
 
   function changePage(n: number) {
+    cancel();
     setPage(n); setBbox(null); setQuoteMode(false); setError("");
   }
 
   async function ask(text: string) {
+    cancel(); const id = rid.current;
     setBusy(true); setError("");
     try {
       let q = text;
       if (!quoteMode) {
         const res = await post("/api/locate", { image: await renderRef.current!(), ask: text });
+        if (id !== rid.current) return;
         if (!res.ok) return setError(await failure(res));
         const located = await res.json();
+        if (id !== rid.current) return;
         if (located.missing) {
           setQuoteMode(true);
           return setError("Couldn't find that on this page — type or paste the question's line.");
@@ -63,14 +72,16 @@ export default function PdfStudio() {
         q = located.question;
       }
       const res = await post("/api/lesson", { topic: q, style, lang, fromQuestion: true });
+      if (id !== rid.current) return;
       if (!res.ok) return setError(await failure(res));
       const { script: s } = await res.json();
+      if (id !== rid.current) return;
       setQuestion(q); setScript(s); setClips(undefined); setStep(0); setDoubt(null); setQuoteMode(false);
       setLayout("asking");
     } catch {
-      setError("Something went wrong. Try again.");
+      if (id === rid.current) setError("Something went wrong. Try again.");
     } finally {
-      setBusy(false);
+      if (id === rid.current) setBusy(false);
     }
   }
 
@@ -79,20 +90,22 @@ export default function PdfStudio() {
     if (!script || !doubt || !doubtText.trim()) return;
     const typed = doubtText.trim();
     const prev = doubt.script ? doubt.question : undefined; // asking again replaces the open doubt; its question is context
-    setDoubtBusy(true); setError("");
-    setDoubt({ question: typed, script: null });
+    rid.current++; const id = rid.current;
+    setBusy(false); setDoubtBusy(true); setError("");
     try {
       const res = await post("/api/lesson", {
         topic: question, style, lang,
         doubt: { question: typed, say: script.steps[step].say, titles: script.steps.slice(0, step + 1).map((s) => s.say.slice(0, 80)), ...(prev && { prev }) },
       });
+      if (id !== rid.current) return;
       if (!res.ok) return setError(await failure(res));
       const { script: s } = await res.json();
-      setDoubt({ question: typed, script: s }); setDoubtText("");
+      if (id !== rid.current) return;
+      setDoubt({ question: typed, script: s }); setDoubtText(""); // only on success, so a failed re-ask keeps the previous answer
     } catch {
-      setError("Something went wrong. Try again.");
+      if (id === rid.current) setError("Something went wrong. Try again.");
     } finally {
-      setDoubtBusy(false);
+      if (id === rid.current) setDoubtBusy(false);
     }
   }
 
@@ -105,10 +118,10 @@ export default function PdfStudio() {
       </label>
       {file && (
         <>
-          <AskBar busy={busy} style={style} onStyle={setStyle} lang={lang} onLang={setLang} onAsk={ask} quoteMode={quoteMode} error={error} />
+          <AskBar busy={busy || !ready} style={style} onStyle={setStyle} lang={lang} onLang={setLang} onAsk={ask} quoteMode={quoteMode} error={error} />
           <div className="pdf-cols">
             <motion.div className="pdf-col" initial={false} animate={{ flexBasis: asking ? "30%" : "66%" }} transition={{ duration: 0.5, ease: "easeInOut" }}>
-              <PdfPane file={file} page={page} onPage={changePage} bbox={bbox} renderRef={renderRef} />
+              <PdfPane file={file} page={page} onPage={changePage} bbox={bbox} renderRef={renderRef} onReady={setReady} />
             </motion.div>
             <motion.div className="pdf-col" initial={false} animate={{ flexBasis: asking ? "70%" : "34%" }} transition={{ duration: 0.5, ease: "easeInOut" }}>
               {script ? (
@@ -123,7 +136,7 @@ export default function PdfStudio() {
                         <label htmlFor="doubt" className="sr-only">Your doubt</label>
                         <input id="doubt" placeholder="What is confusing here?" maxLength={600} value={doubtText} onChange={(e) => setDoubtText(e.target.value)} />
                         <button type="submit" className="btn" disabled={doubtBusy || !doubtText.trim()}>{doubtBusy ? "Working..." : "Ask"}</button>
-                        <button type="button" className="btn ghost" onClick={() => { setDoubt(null); setDoubtText(""); }}>Close</button>
+                        <button type="button" className="btn ghost" onClick={() => { cancel(); setDoubt(null); setDoubtText(""); }}>Close</button>
                       </form>
                       {doubt.script && <Player key={doubt.question} script={doubt.script} autoplay />}
                     </div>
