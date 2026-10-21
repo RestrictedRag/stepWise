@@ -24,8 +24,12 @@ export default function Player({ script, autoplay = false, bare = false, clips, 
   const [playing, setPlaying] = useState(autoplay);
   const [voice, setVoice] = useState(clips !== undefined || onClips !== undefined); // PDF page speaks by default; /board stays muted: browsers block sound before a click
   const [heard, setHeard] = useState(-1); // step whose narration finished
-  const [textPaced, setTextPaced] = useState(!voice); // no audio for this step: advance at reading pace
-  const [delays, setDelays] = useState<number[] | undefined>();
+  // delays and the no-audio flag are tagged with the step/run they belong to, so a new step never renders with the previous step's values
+  const key = `${i}-${run}`;
+  const [dTag, setDTag] = useState<{ key: string; d: number[] } | null>(null);
+  const [pacedKey, setPacedKey] = useState(""); // step whose clip is missing or failed: advance at reading pace
+  const delays = dTag?.key === key ? dTag.d : undefined;
+  const textPaced = !voice || pacedKey === key;
   const [pausedState, setPausedState] = useState(false);
   const isPaused = paused ?? pausedState;
 
@@ -41,29 +45,30 @@ export default function Player({ script, autoplay = false, bare = false, clips, 
     if (!voice || clipPs.current?.steps === steps) return;
     const ps = loadClips(steps.map((s) => s.say), speak, live.current.clips);
     clipPs.current = { steps, ps };
-    Promise.all(ps).then((c) => live.current.onClips?.(c));
+    Promise.all(ps).then((c) => { if (clipPs.current?.steps === steps) live.current.onClips?.(c); });
   }, [voice, steps]);
 
   // Start the current step: wait for its clip, then sync the shapes to the clip length and play it.
   useEffect(() => {
     left.current = null;
-    setHeard(-1); setDelays(undefined); setTextPaced(!voice);
+    setHeard(-1);
     if (lastStep.current !== i) { lastStep.current = i; live.current.onStep?.(i); }
     if (!voice) return;
     let gone = false, url = "";
     const a = new Audio();
+    const k = `${i}-${run}`;
     audio.current = a;
     clipPs.current!.ps[i].then((b) => {
       if (gone) return;
-      if (!b) { setTextPaced(true); return; }
+      if (!b) { setPacedKey(k); return; }
       url = URL.createObjectURL(b);
       a.onended = () => { if (!gone) setHeard(i); };
-      a.onerror = () => { if (!gone) setTextPaced(true); };
+      a.onerror = () => { if (!gone) setPacedKey(k); };
       a.onloadedmetadata = () => {
         if (gone) return;
         const secs = isFinite(a.duration) ? a.duration : stepSeconds(steps[i]);
-        setDelays(shapeDelays(steps[i], secs));
-        if (!pausedRef.current) a.play().catch(() => setTextPaced(true));
+        setDTag({ key: k, d: shapeDelays(steps[i], secs) });
+        if (!pausedRef.current) a.play().catch(() => setPacedKey(k));
       };
       a.src = url;
     });
