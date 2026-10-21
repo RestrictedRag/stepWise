@@ -216,3 +216,14 @@ a { color: inherit; }
 .chip { font: inherit; font-size: .9rem; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--muted); cursor: pointer; transition: color .2s, border-color .2s, transform .2s; }
 .chip:hover { color: var(--fg); border-color: var(--accent); transform: translateY(-1px); }
 .solver .answer { margin-top: 24px; }
+
+/* /pdf: two columns whose flex-basis framer-motion animates; the board keeps its own --bh sizing */
+.pdf-studio { display: grid; gap: 16px; }
+.pdf-cols { display: flex; gap: 16px; align-items: flex-start; }
+.pdf-col { min-width: 0; display: grid; gap: 12px; }
+.pdf-page { position: relative; width: 100%; }
+.pdf-page canvas { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.pdf-box { position: absolute; border: 3px solid var(--orange); border-radius: 4px; background: color-mix(in srgb, var(--orange) 18%, transparent); pointer-events: none; }
+.pdf-drawer { display: grid; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.pdf-drawer input { flex: 1 1 200px; font: inherit; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--fg); }
+.ask-bar .chips .btn[aria-pressed=true] { border-color: var(--accent); color: var(--accent); }

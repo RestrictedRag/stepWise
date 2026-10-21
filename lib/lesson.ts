@@ -31,11 +31,19 @@ function tryParse(text: string): { script: BoardScript } | { error: string } {
   }
 }
 
+function doubtMessage({ topic, doubt: d }: LessonRequest) {
+  return `Topic: ${topic}
+Steps so far: ${d!.titles.join("; ")}
+Current step said: ${d!.say}
+${d!.prev ? `Earlier doubt: ${d!.prev}
+` : ""}Student's doubt: ${d!.question}`;
+}
+
 // Ask the LLM for a board script; one repair round on bad output, then a fixture or text-only fallback.
 export async function generateLesson(req: LessonRequest, ask: (m: Msg[]) => Promise<string>): Promise<{ script: BoardScript; fallback: boolean }> {
   const messages: Msg[] = [
     { role: "system", content: lessonSystem(req) },
-    { role: "user", content: `Topic: ${req.topic}` },
+    { role: "user", content: req.doubt ? doubtMessage(req) : `Topic: ${req.topic}` },
   ];
   let reply = "";
   try {

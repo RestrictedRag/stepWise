@@ -22,7 +22,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <footer className="foot">
           <div className="wrap">
             <p><strong>StepWise</strong><span className="muted">Learn the method, not just copy the answer.</span></p>
-            <nav aria-label="Footer"><a href="/solve">Solve</a><a href="/board">Board</a></nav>
+            <nav aria-label="Footer"><a href="/solve">Solve</a><a href="/board">Board</a><a href="/pdf">PDF</a></nav>
           </div>
         </footer>
       </body>

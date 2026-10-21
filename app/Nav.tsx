@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { motion, MotionConfig } from "framer-motion";
 
-const TABS = [["/", "Home"], ["/solve", "Solve"], ["/board", "Board"]] as const;
+const TABS = [["/", "Home"], ["/solve", "Solve"], ["/board", "Board"], ["/pdf", "PDF"]] as const;
 
 export default function Nav() {
   const path = usePathname();

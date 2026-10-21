@@ -31,3 +31,13 @@ test("style defaults to empty, fromQuestion to false", () => {
 test("topic up to 600 chars is accepted", () => {
   const r = parseLessonRequest({ topic: "a".repeat(600) }) as any; assert.equal(r.error, undefined);
 });
+
+test("doubt payload is trimmed, capped and optional", () => {
+  const r = parseLessonRequest({ topic: "Q3", doubt: { question: " why? ", say: "x".repeat(900), titles: Array(12).fill("t"), prev: "how?" } }) as any;
+  assert.equal(r.doubt?.question, "why?");
+  assert.equal(r.doubt?.say.length, 600);
+  assert.equal(r.doubt?.titles.length, 8);
+  assert.equal(r.doubt?.prev, "how?");
+  assert.equal((parseLessonRequest({ topic: "Q3" }) as any).doubt, undefined);
+  assert.equal((parseLessonRequest({ topic: "Q3", doubt: { question: "" } }) as any).doubt, undefined);
+});
