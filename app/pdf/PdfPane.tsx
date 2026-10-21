@@ -7,15 +7,17 @@ type Props = {
   bbox: [number, number, number, number] | null;
   renderRef: MutableRefObject<(() => Promise<string>) | null>;
   onReady: (ready: boolean) => void;
+  saved: { id: string; label: string }[]; onOpen: (id: string) => void;
 };
 
-export default function PdfPane({ file, page, onPage, bbox, renderRef, onReady }: Props) {
+export default function PdfPane({ file, page, onPage, bbox, renderRef, onReady, saved, onOpen }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const doc = useRef<any>(null);
   const done = useRef<Promise<void>>(Promise.resolve()); // never rejects
   const ok = useRef(false);
   const [count, setCount] = useState(0);
   const [error, setError] = useState("");
+  const [menu, setMenu] = useState(false);
 
   useEffect(() => {
     let dead = false;
@@ -80,7 +82,11 @@ export default function PdfPane({ file, page, onPage, bbox, renderRef, onReady }
         <button type="button" className="btn ghost" onClick={() => onPage(page - 1)} disabled={page <= 1}>Prev</button>
         <span className="muted step-count">Page {page}{count ? ` of ${count}` : ""}</span>
         <button type="button" className="btn ghost" onClick={() => onPage(page + 1)} disabled={!count || page >= count}>Next</button>
+        <button type="button" className="btn ghost" aria-expanded={menu} disabled={!saved.length} onClick={() => setMenu(!menu)}>Saved ▾</button>
       </div>
+      {menu && (
+        <ul>{saved.map((s) => <li key={s.id}><button type="button" className="btn ghost" onClick={() => { setMenu(false); onOpen(s.id); }}>{s.label}</button></li>)}</ul>
+      )}
     </div>
   );
 }
