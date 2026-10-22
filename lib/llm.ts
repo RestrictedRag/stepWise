@@ -22,7 +22,7 @@ export async function llmChat(messages: Msg[], opts: { stream?: boolean; tempera
     }),
   });
   let res = await call(opts.json);
-  if (opts.json && res.status === 400) res = await call(false); // Groq json_validate_failed: retry as free text, extractJson parses it
+  if (opts.json && res.status === 400) { await res.body?.cancel(); res = await call(false); } // Groq json_validate_failed: retry as free text, extractJson parses it
   if (!res.ok) throw new Error(`LLM ${res.status}: ${await res.text()}`);
   return res;
 }

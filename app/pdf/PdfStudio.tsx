@@ -95,7 +95,7 @@ export default function PdfStudio() {
     setPage(l.page); setBbox(null); setQuoteMode(false); setError(""); setNotice("");
     setLang(l.lang as Lang); setStyle(l.style); setQuestion(l.question); setScript(l.script); setClips(l.clips); setStep(l.step); setStart(l.step);
     setDoubt(null); setLayout("asking"); setPlayKey((n) => n + 1);
-    savedId.current = l.id;
+    savedId.current = l.id; meta.current = { question: l.question, style: l.style, page: l.page, lang: l.lang as Lang };
   }
 
   async function onClips(c: (Blob | null)[]) {
