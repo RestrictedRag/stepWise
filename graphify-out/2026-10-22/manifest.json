@@ -11,12 +11,6 @@
     "ast_hash": "788334967cdfe7c0249c2ea7ba20c0a1",
     "semantic_hash": "788334967cdfe7c0249c2ea7ba20c0a1"
   },
-  "app/Nav.tsx": {
-    "mtime": 1792597645.1680963,
-    "seen": 1792597747.784821,
-    "ast_hash": "f914c3a242e3420d4a137de2963f5a64",
-    "semantic_hash": ""
-  },
   "app/ScrollReveal.tsx": {
     "mtime": 1792470644.0764332,
     "seen": 1792481777.0357602,
@@ -72,22 +66,22 @@
     "semantic_hash": "674f2464459d101ca6efb27dfe661a58"
   },
   "app/layout.tsx": {
-    "mtime": 1792597645.1921854,
-    "seen": 1792597747.784821,
-    "ast_hash": "7095723dec620679f44cc78d00641a11",
+    "mtime": 1792632386.0504334,
+    "seen": 1792633783.3431547,
+    "ast_hash": "5ab7216d909b7581acb3fe4e3fc52b45",
     "semantic_hash": ""
   },
   "app/page.tsx": {
-    "mtime": 1792470513.7193131,
-    "seen": 1792481777.0357602,
-    "ast_hash": "23691baec87d30409609be7ea4310e99",
-    "semantic_hash": "23691baec87d30409609be7ea4310e99"
+    "mtime": 1792632970.451583,
+    "seen": 1792633783.3431547,
+    "ast_hash": "250435ee4e455f6641c0da75cebe54be",
+    "semantic_hash": ""
   },
   "app/solve/Solver.tsx": {
-    "mtime": 1792478772.9547455,
-    "seen": 1792481777.0357602,
-    "ast_hash": "943a0151ad5f4677a783daf3b5b46c7b",
-    "semantic_hash": "943a0151ad5f4677a783daf3b5b46c7b"
+    "mtime": 1792633709.60095,
+    "seen": 1792633783.3431547,
+    "ast_hash": "393bd483c58a02f4d0bbd87d3ed02f70",
+    "semantic_hash": ""
   },
   "app/solve/page.tsx": {
     "mtime": 1792469116.7602923,
@@ -204,9 +198,9 @@
     "semantic_hash": "fc5964fe9adf8f132c3c0beee585349f"
   },
   "next-env.d.ts": {
-    "mtime": 1792628293.9082873,
-    "seen": 1792628305.5984988,
-    "ast_hash": "0e4a65e8b2b9aa3ed0f8957b9406bd41",
+    "mtime": 1792630945.3172474,
+    "seen": 1792633783.3436537,
+    "ast_hash": "c7b887684e81cfa5830eeeb7286485f6",
     "semantic_hash": ""
   },
   "package.json": {
@@ -342,9 +336,9 @@
     "semantic_hash": ""
   },
   "app/pdf/AskBar.tsx": {
-    "mtime": 1792597612.861252,
-    "seen": 1792597747.784821,
-    "ast_hash": "5a78f1918c9065f617fe48b82414fb61",
+    "mtime": 1792633541.41827,
+    "seen": 1792633783.3431547,
+    "ast_hash": "26f3c384dcf1f9acf662a692ef22cf01",
     "semantic_hash": ""
   },
   "app/pdf/PdfPane.tsx": {
@@ -354,15 +348,15 @@
     "semantic_hash": ""
   },
   "app/pdf/PdfStudio.tsx": {
-    "mtime": 1792628479.215232,
-    "seen": 1792628494.8800533,
-    "ast_hash": "ae9e337e9be6c11effd304cbc52a5b26",
+    "mtime": 1792633445.7238293,
+    "seen": 1792633783.3431547,
+    "ast_hash": "c7842d7079e73e3118aa1c96c2187eb7",
     "semantic_hash": ""
   },
   "app/pdf/page.tsx": {
-    "mtime": 1792597612.773565,
-    "seen": 1792597747.784821,
-    "ast_hash": "04c215ec91903641bda33d29cd1c126a",
+    "mtime": 1792633495.5611506,
+    "seen": 1792633783.3431547,
+    "ast_hash": "68072f3f9d9144feeaeef761934b668c",
     "semantic_hash": ""
   },
   "lib/pdfstore.test.ts": {
@@ -381,6 +375,12 @@
     "mtime": 1792628479.3588274,
     "seen": 1792628494.8800533,
     "ast_hash": "bff7e2886fc1a2be951e406675e83784",
+    "semantic_hash": ""
+  },
+  "app/Sidebar.tsx": {
+    "mtime": 1792632288.580689,
+    "seen": 1792633783.3431547,
+    "ast_hash": "ff3466fb1161256e164bbd9991f7b91e",
     "semantic_hash": ""
   }
 }
