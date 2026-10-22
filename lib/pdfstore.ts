@@ -11,13 +11,14 @@ const done = (t: IDBTransaction) => new Promise<void>((ok, no) => { t.oncomplete
 // shortcut: one connection opened per call, fine at prototype volume; cache it if calls get chatty.
 function open() {
   const r = indexedDB.open("stepwise-pdf", 1);
+  const blocked = new Promise<never>((_, no) => { r.onblocked = () => no(new Error("blocked")); });
   r.onupgradeneeded = () => {
     const db = r.result;
     db.createObjectStore("pdfs", { keyPath: "key" });
     db.createObjectStore("lessons", { keyPath: "id" }).createIndex("pdfKey", "pdfKey");
     db.createObjectStore("prefs", { keyPath: "pdfKey" });
   };
-  return req(r);
+  return Promise.race([req(r), blocked]);
 }
 
 async function tx<T>(store: string, mode: IDBTransactionMode, run: (s: IDBObjectStore) => Promise<T> | T): Promise<T> {
@@ -25,6 +26,7 @@ async function tx<T>(store: string, mode: IDBTransactionMode, run: (s: IDBObject
   try {
     const t = db.transaction(store, mode);
     const finished = done(t);
+    finished.catch(() => {}); // observed here; the await below still rethrows
     const out = await run(t.objectStore(store));
     await finished;
     return out;

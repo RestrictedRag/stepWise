@@ -23,6 +23,10 @@ test("style is cleaned and capped", () => {
   assert.ok(!r.style.includes("\n")); assert.equal(r.style.length, 80);
 });
 
+test("style loses quotes and backslashes", () => {
+  assert.equal((parseLessonRequest({ topic: "cells", style: 'say "hi" \\ now' }) as LessonRequest).style, "say hi now");
+});
+
 test("style defaults to empty, fromQuestion to false", () => {
   const r = parseLessonRequest({ topic: "cells" }) as LessonRequest;
   assert.equal(r.style, ""); assert.equal(r.fromQuestion, false);

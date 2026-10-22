@@ -51,7 +51,7 @@ export function parseLessonRequest(body: any): (LessonRequest & { error?: undefi
   const level = pick(LEVELS, body?.level, "middle");
   const lang = pick(LANGS, body?.lang, "en");
   if (!persona || !level || !lang) return { error: "Unknown persona, level or language." };
-  const style = typeof body?.style === "string" ? body.style.replace(/\s+/g, " ").trim().slice(0, MAX_STYLE) : "";
+  const style = typeof body?.style === "string" ? body.style.replace(/["\\]/g, "").replace(/\s+/g, " ").trim().slice(0, MAX_STYLE) : "";
   const doubt = parseDoubt(body?.doubt);
   return { topic, persona, level, lang, style, fromQuestion: body?.fromQuestion === true, ...(doubt && { doubt }) };
 }

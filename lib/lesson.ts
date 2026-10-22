@@ -31,7 +31,7 @@ function tryParse(text: string): { script: BoardScript } | { error: string } {
   }
 }
 
-function doubtMessage({ topic, doubt: d }: LessonRequest) {
+export function doubtMessage({ topic, doubt: d }: LessonRequest) {
   return `Topic: ${topic}
 Steps so far: ${d!.titles.join("; ")}
 Current step said: ${d!.say}

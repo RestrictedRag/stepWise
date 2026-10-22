@@ -7,7 +7,7 @@ type Props = {
   bbox: [number, number, number, number] | null;
   renderRef: MutableRefObject<(() => Promise<string>) | null>;
   onReady: (ready: boolean) => void;
-  saved: { id: string; label: string }[]; onOpen: (id: string) => void;
+  saved: { id: string; label: string; at?: number }[]; onOpen: (id: string) => void;
 };
 
 export default function PdfPane({ file, page, onPage, bbox, renderRef, onReady, saved, onOpen }: Props) {
@@ -42,6 +42,7 @@ export default function PdfPane({ file, page, onPage, bbox, renderRef, onReady, 
 
   useEffect(() => {
     if (!count) return;
+    ok.current = false; onReady(false); // a new page is not ready until it renders
     let task: { promise: Promise<void>; cancel: () => void } | undefined;
     let dead = false;
     const prev = done.current;
@@ -85,7 +86,7 @@ export default function PdfPane({ file, page, onPage, bbox, renderRef, onReady, 
         <button type="button" className="btn ghost" aria-expanded={menu} disabled={!saved.length} onClick={() => setMenu(!menu)}>Saved ▾</button>
       </div>
       {menu && (
-        <ul>{saved.map((s) => <li key={s.id}><button type="button" className="btn ghost" onClick={() => { setMenu(false); onOpen(s.id); }}>{s.label}</button></li>)}</ul>
+        <ul className="pdf-saved">{saved.map((s) => <li key={s.id}><button type="button" className="btn ghost" onClick={() => { setMenu(false); onOpen(s.id); }}>{s.label}{s.at ? <small className="muted"> {new Date(s.at).toLocaleDateString()}</small> : null}</button></li>)}</ul>
       )}
     </div>
   );

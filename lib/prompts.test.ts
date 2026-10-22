@@ -27,3 +27,7 @@ test("a doubt asks for 2-3 steps about the current step", () => {
   assert.match(p, /2-3 steps/);
   assert.doesNotMatch(lessonSystem({ ...base, style: "", fromQuestion: false }), /2-3 steps/);
 });
+
+test("empty style omits the narration style line", () => {
+  assert.doesNotMatch(lessonSystem({ ...base, style: "", fromQuestion: false }), /Narration style/);
+});

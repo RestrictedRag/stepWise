@@ -4,7 +4,7 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
 
 // One Gemini vision call: image + prompt in, text out. Throws on non-OK or empty reply.
 export async function geminiText(image: Image, prompt: string, json = false): Promise<string> {
-  const res = await fetch(
+  const call = () => fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
     {
       method: "POST",
@@ -15,6 +15,12 @@ export async function geminiText(image: Image, prompt: string, json = false): Pr
       }),
     },
   );
+  let res = await call();
+  for (const wait of [1000, 2000]) { // overloaded (503) or rate-limited (429): back off and retry
+    if (res.status !== 503 && res.status !== 429) break;
+    await new Promise((r) => setTimeout(r, wait));
+    res = await call();
+  }
   if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
   const data = await res.json();
   const text = (data.candidates?.[0]?.content?.parts ?? []).map((p: { text?: string }) => p.text ?? "").join("").trim();

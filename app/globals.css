@@ -198,7 +198,7 @@ a { color: inherit; }
 .player.paused .board * { animation-play-state: paused; }
 @keyframes draw { to { stroke-dashoffset: 0; } }
 @keyframes type { to { clip-path: inset(-50% -10% -50% 0); } }
-@media (prefers-reduced-motion: reduce) { .board * { animation: none !important; stroke-dashoffset: 0 !important; clip-path: none !important; } }
+@media (prefers-reduced-motion: reduce) { .board * { animation: none !important; stroke-dashoffset: 0 !important; clip-path: none !important; } .board .dot { opacity: 1 !important; } }
 .player { display: grid; gap: 12px; }
 .caption { font-size: 1.1rem; min-height: 3.4em; margin: 0; padding-inline: 4px; }
 .player .btn { padding: 8px 14px; }
@@ -233,6 +233,8 @@ a { color: inherit; }
 .pdf-page { position: relative; width: 100%; }
 .pdf-page canvas { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
 .pdf-box { position: absolute; border: 3px solid var(--orange); border-radius: 4px; background: color-mix(in srgb, var(--orange) 18%, transparent); pointer-events: none; }
+.pdf-saved { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.pdf-saved .btn { width: 100%; justify-content: space-between; text-align: left; }
 .pdf-drawer { display: grid; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
 .pdf-drawer input { flex: 1 1 200px; font: inherit; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--fg); }
 .ask-bar .chips .btn[aria-pressed=true] { border-color: var(--accent); color: var(--accent); }

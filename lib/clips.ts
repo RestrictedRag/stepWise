@@ -3,6 +3,7 @@ export function loadClips(says: string[], speak: (text: string) => Promise<Blob 
   if (!says.length) return [];
   if (stored) return stored.map((b) => Promise.resolve(b));
   const one = (t: string) => speak(t).catch(() => null);
-  const first = one(says[0]);
-  return says.map((t, i) => (i === 0 ? first : first.then(() => one(t))));
+  const ps: Promise<Blob | null>[] = [];
+  says.forEach((t, i) => ps.push(i === 0 ? one(t) : ps[i - 1].then(() => one(t)))); // sequential: parallel calls 502 upstream
+  return ps;
 }

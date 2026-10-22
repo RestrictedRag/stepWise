@@ -8,7 +8,7 @@ export type Msg = { role: "system" | "user" | "assistant"; content: string };
 // Returns the upstream Response (an SSE stream when stream is true); throws on network or HTTP errors.
 export async function llmChat(messages: Msg[], opts: { stream?: boolean; temperature?: number; max_tokens?: number; json?: boolean } = {}) {
   if (!API_KEY) throw new Error("GROQ_API_KEY is not set");
-  const res = await fetch(`${BASE_URL}/chat/completions`, {
+  const call = (json?: boolean) => fetch(`${BASE_URL}/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${API_KEY}` },
     body: JSON.stringify({
@@ -17,10 +17,12 @@ export async function llmChat(messages: Msg[], opts: { stream?: boolean; tempera
       temperature: opts.temperature ?? 0.6,
       top_p: 0.95,
       max_tokens: opts.max_tokens ?? 2048,
-      ...(opts.json && { response_format: { type: "json_object" } }),
+      ...(json && { response_format: { type: "json_object" } }),
       messages,
     }),
   });
+  let res = await call(opts.json);
+  if (opts.json && res.status === 400) res = await call(false); // Groq json_validate_failed: retry as free text, extractJson parses it
   if (!res.ok) throw new Error(`LLM ${res.status}: ${await res.text()}`);
   return res;
 }

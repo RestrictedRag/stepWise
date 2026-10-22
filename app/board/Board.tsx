@@ -32,7 +32,7 @@ function Typed({ x, y, text, size, color, delay, bold, rotate = 0, dur }: { x: n
 
 // Small filled dot where a stroke ends, fading in as the draw finishes (ink bleed).
 // CSS animation (not framer) so it freezes with the strokes when the player pauses.
-function Bleed({ at, color, delay }: { at: [number, number]; color: Color; delay: number; done?: boolean }) {
+function Bleed({ at, color, delay }: { at: [number, number]; color: Color; delay: number }) {
   return <circle className="dot" cx={at[0]} cy={at[1]} r={3} style={{ fill: `var(--c-${color})`, animationDelay: `${delay + STROKE - 0.1}s` }} />;
 }
 
@@ -44,7 +44,7 @@ const ICON_END: Record<Icon, [number, number]> = { crown: [4, 30], bolt: [23, 2]
 function Shape({ s, delay, done }: { s: ShapeData; delay: number; done: boolean }) {
   const stroke = { stroke: `var(--c-${s.color})`, animationDelay: `${delay}s`, animationTimingFunction: "ease-in-out" };
   const p = { className: "s", pathLength: 1, style: stroke };
-  const dot = (at: [number, number]) => <Bleed at={at} color={s.color} delay={delay} done={done} />;
+  const dot = (at: [number, number]) => <Bleed at={at} color={s.color} delay={delay} />;
   switch (s.type) {
     case "line": return <g><line {...p} x1={s.from[0]} y1={s.from[1]} x2={s.to[0]} y2={s.to[1]} />{dot(s.to)}</g>;
     case "highlight": {

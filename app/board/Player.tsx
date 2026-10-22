@@ -5,18 +5,18 @@ import type { BoardScript } from "../../lib/board";
 import { loadClips } from "../../lib/clips";
 import { shapeDelays } from "../../lib/sync";
 
-const speak = (text: string) =>
-  fetch("/api/speak", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) }).then((r) => (r.ok ? r.blob() : null));
+const speak = (text: string, lang?: string) =>
+  fetch("/api/speak", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, lang }) }).then((r) => (r.ok ? r.blob() : null));
 
 type Props = {
   script: BoardScript; autoplay?: boolean; bare?: boolean;
   clips?: (Blob | null)[]; onClips?: (clips: (Blob | null)[]) => void;
-  startStep?: number; onStep?: (i: number) => void;
+  lang?: string; startStep?: number; onStep?: (i: number) => void;
   paused?: boolean; // controlled: when defined it overrides the Pause button
 };
 
 // bare: skip the framed stage when a parent (the home hero) already frames the board.
-export default function Player({ script, autoplay = false, bare = false, clips, onClips, startStep, onStep, paused }: Props) {
+export default function Player({ script, autoplay = false, bare = false, clips, onClips, lang, startStep, onStep, paused }: Props) {
   const { steps } = script;
   const last = steps.length - 1;
   const [i, setI] = useState(Math.min(Math.max(startStep ?? 0, 0), last));
@@ -33,7 +33,7 @@ export default function Player({ script, autoplay = false, bare = false, clips, 
   const [pausedState, setPausedState] = useState(false);
   const isPaused = paused ?? pausedState;
 
-  const live = useRef({ clips, onClips, onStep }); live.current = { clips, onClips, onStep };
+  const live = useRef({ clips, onClips, onStep, lang }); live.current = { clips, onClips, onStep, lang };
   const pausedRef = useRef(isPaused); pausedRef.current = isPaused;
   const clipPs = useRef<{ steps: typeof steps; ps: Promise<Blob | null>[] } | null>(null); // cached per script so Mute/Voice cycles reuse it
   const lastStep = useRef(-1);
@@ -43,7 +43,7 @@ export default function Player({ script, autoplay = false, bare = false, clips, 
   // Fetch all clips (or reuse stored ones) once voice is on.
   useEffect(() => {
     if (!voice || clipPs.current?.steps === steps) return;
-    const ps = loadClips(steps.map((s) => s.say), speak, live.current.clips);
+    const ps = loadClips(steps.map((s) => s.say), (t) => speak(t, live.current.lang), live.current.clips);
     clipPs.current = { steps, ps };
     Promise.all(ps).then((c) => { if (clipPs.current?.steps === steps) live.current.onClips?.(c); });
   }, [voice, steps]);
