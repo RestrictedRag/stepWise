@@ -26,6 +26,8 @@ body {
 
 .font-board { font-family: var(--font-board), cursive; }
 
+.nav-item:hover { background: var(--line); }
+
 @keyframes shimmer {
   from { background-position: 200% 0; }
   to { background-position: -200% 0; }

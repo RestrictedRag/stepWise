@@ -20,6 +20,7 @@ export function listEntries(store: Storage = globalThis.localStorage): Entry[] {
 export function saveEntry(e: Entry, store: Storage = globalThis.localStorage): void {
   try {
     store.setItem(KEY, JSON.stringify([e, ...listEntries(store)].slice(0, 50)));
+    if (typeof window !== "undefined") window.dispatchEvent(new Event("solvely:history"));
   } catch {
     // storage full or blocked: history is best-effort
   }

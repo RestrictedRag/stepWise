@@ -38,3 +38,16 @@ test("throwing store is ignored", () => {
   assert.deepEqual(listEntries(s), []);
   assert.doesNotThrow(() => saveEntry(newEntry("quiz", "x"), s));
 });
+
+test("saveEntry dispatches solvely:history", () => {
+  const g = globalThis as { window?: EventTarget };
+  g.window = new EventTarget();
+  let fired = false;
+  g.window.addEventListener("solvely:history", () => { fired = true; });
+  try {
+    saveEntry(newEntry("solver", "x"), fakeStore());
+    assert.equal(fired, true);
+  } finally {
+    delete g.window;
+  }
+});
