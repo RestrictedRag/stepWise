@@ -1,7 +1,7 @@
 {
   ".claude/launch.json": {
-    "mtime": 1792469136.4452972,
-    "seen": 1792481777.0357602,
+    "mtime": 1792677094.2240658,
+    "seen": 1792677188.0653605,
     "ast_hash": "ead7c774de16be9cb245223d925fc16e",
     "semantic_hash": "ead7c774de16be9cb245223d925fc16e"
   },
@@ -42,28 +42,28 @@
     "semantic_hash": ""
   },
   "app/board/Board.tsx": {
-    "mtime": 1792628209.4588065,
-    "seen": 1792628305.5984988,
-    "ast_hash": "888c9517a9dd002785b58dba1909a785",
+    "mtime": 1792674813.7940266,
+    "seen": 1792674892.166213,
+    "ast_hash": "6d187ffe8a3ee9bbf27b4dcfddb534a3",
     "semantic_hash": ""
   },
   "app/board/Player.tsx": {
-    "mtime": 1792628209.4568212,
-    "seen": 1792628305.5984988,
-    "ast_hash": "8b965a4701265a3c65b380b2848416e5",
+    "mtime": 1792676957.063281,
+    "seen": 1792677188.0653605,
+    "ast_hash": "650440bd2c68266ee75763d4360ed85d",
     "semantic_hash": ""
   },
   "app/board/Teach.tsx": {
-    "mtime": 1792469126.742485,
-    "seen": 1792481777.0357602,
-    "ast_hash": "8bedc914b595814cff74bda02e196271",
-    "semantic_hash": "8bedc914b595814cff74bda02e196271"
+    "mtime": 1792676957.1669288,
+    "seen": 1792677188.0653605,
+    "ast_hash": "d60ed28e9e7adf58a147bb5662ea6d68",
+    "semantic_hash": ""
   },
   "app/board/page.tsx": {
-    "mtime": 1792469126.742485,
-    "seen": 1792481777.0357602,
-    "ast_hash": "674f2464459d101ca6efb27dfe661a58",
-    "semantic_hash": "674f2464459d101ca6efb27dfe661a58"
+    "mtime": 1792675693.571715,
+    "seen": 1792675806.1836433,
+    "ast_hash": "6f85cf38c1ed8b7f1bdc6bf674762ad5",
+    "semantic_hash": ""
   },
   "app/layout.tsx": {
     "mtime": 1792632386.0504334,
@@ -288,9 +288,9 @@
     "semantic_hash": ""
   },
   "lib/gemini.ts": {
-    "mtime": 1792628194.5954287,
-    "seen": 1792628305.5984988,
-    "ast_hash": "a494b177442aad1e334573a98cb5aaed",
+    "mtime": 1792675218.691174,
+    "seen": 1792675806.1836433,
+    "ast_hash": "72fbaac81c1788a0911e9a7740e59da9",
     "semantic_hash": ""
   },
   "lib/locate.test.ts": {
@@ -348,9 +348,9 @@
     "semantic_hash": ""
   },
   "app/pdf/PdfStudio.tsx": {
-    "mtime": 1792633445.7238293,
-    "seen": 1792633783.3431547,
-    "ast_hash": "c7842d7079e73e3118aa1c96c2187eb7",
+    "mtime": 1792674519.2869673,
+    "seen": 1792674892.166213,
+    "ast_hash": "2609541669da98dad17e1dde45419b05",
     "semantic_hash": ""
   },
   "app/pdf/page.tsx": {
@@ -387,6 +387,12 @@
     "mtime": 1792635781.5330205,
     "seen": 1792635887.8756888,
     "ast_hash": "5b679dd95d5f0781e0fe6ad38f6e03d1",
+    "semantic_hash": ""
+  },
+  "lib/gemini.test.ts": {
+    "mtime": 1792675218.6941812,
+    "seen": 1792675806.1836433,
+    "ast_hash": "41359b4b19660d40ce7649b03f778c12",
     "semantic_hash": ""
   }
 }

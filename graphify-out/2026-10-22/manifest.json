@@ -18,10 +18,10 @@
     "semantic_hash": "62a59b76c73a2f175aacfb185c4fd125"
   },
   "app/api/lesson/route.ts": {
-    "mtime": 1792477315.8544369,
-    "seen": 1792481777.0357602,
-    "ast_hash": "b704e49ead1dc14a862027cb77d833df",
-    "semantic_hash": "b704e49ead1dc14a862027cb77d833df"
+    "mtime": 1792635067.527109,
+    "seen": 1792635887.8748007,
+    "ast_hash": "96a3152813d814d6fd6d2c8d34b67862",
+    "semantic_hash": ""
   },
   "app/api/listen/route.ts": {
     "mtime": 1792477407.015224,
@@ -42,28 +42,28 @@
     "semantic_hash": ""
   },
   "app/board/Board.tsx": {
-    "mtime": 1792628209.4588065,
-    "seen": 1792628305.5984988,
-    "ast_hash": "888c9517a9dd002785b58dba1909a785",
+    "mtime": 1792674813.7940266,
+    "seen": 1792674892.166213,
+    "ast_hash": "6d187ffe8a3ee9bbf27b4dcfddb534a3",
     "semantic_hash": ""
   },
   "app/board/Player.tsx": {
-    "mtime": 1792628209.4568212,
-    "seen": 1792628305.5984988,
-    "ast_hash": "8b965a4701265a3c65b380b2848416e5",
+    "mtime": 1792674105.9113715,
+    "seen": 1792674892.166213,
+    "ast_hash": "0cb881a6a2ea1f3cda26868181fe86d1",
     "semantic_hash": ""
   },
   "app/board/Teach.tsx": {
-    "mtime": 1792469126.742485,
-    "seen": 1792481777.0357602,
-    "ast_hash": "8bedc914b595814cff74bda02e196271",
-    "semantic_hash": "8bedc914b595814cff74bda02e196271"
+    "mtime": 1792675648.961637,
+    "seen": 1792675806.1836433,
+    "ast_hash": "169aab0dd21588a362575ec5c9367241",
+    "semantic_hash": ""
   },
   "app/board/page.tsx": {
-    "mtime": 1792469126.742485,
-    "seen": 1792481777.0357602,
-    "ast_hash": "674f2464459d101ca6efb27dfe661a58",
-    "semantic_hash": "674f2464459d101ca6efb27dfe661a58"
+    "mtime": 1792675693.571715,
+    "seen": 1792675806.1836433,
+    "ast_hash": "6f85cf38c1ed8b7f1bdc6bf674762ad5",
+    "semantic_hash": ""
   },
   "app/layout.tsx": {
     "mtime": 1792632386.0504334,
@@ -78,9 +78,9 @@
     "semantic_hash": ""
   },
   "app/solve/Solver.tsx": {
-    "mtime": 1792633709.60095,
-    "seen": 1792633783.3431547,
-    "ast_hash": "393bd483c58a02f4d0bbd87d3ed02f70",
+    "mtime": 1792635782.0167894,
+    "seen": 1792635887.8756888,
+    "ast_hash": "6b3b3d4eeac9951604693f5cae41cf54",
     "semantic_hash": ""
   },
   "app/solve/page.tsx": {
@@ -126,15 +126,15 @@
     "semantic_hash": "83ebbffedb8542803c1216b144aa59a7"
   },
   "lib/lesson.test.ts": {
-    "mtime": 1792628209.4598117,
-    "seen": 1792628305.5984988,
-    "ast_hash": "35497806aeef6e1e93e8ef0a94baacea",
+    "mtime": 1792635067.5276082,
+    "seen": 1792635887.8756888,
+    "ast_hash": "80e0073da61ced9ba04a7de45d26e251",
     "semantic_hash": ""
   },
   "lib/lesson.ts": {
-    "mtime": 1792628209.4593072,
-    "seen": 1792628305.5984988,
-    "ast_hash": "f097f120e127f9d3a45bdad228dba949",
+    "mtime": 1792635067.526603,
+    "seen": 1792635887.8756888,
+    "ast_hash": "2ca84ebe08e85d72e927ec487ad0f1e1",
     "semantic_hash": ""
   },
   "lib/llm.ts": {
@@ -288,9 +288,9 @@
     "semantic_hash": ""
   },
   "lib/gemini.ts": {
-    "mtime": 1792628194.5954287,
-    "seen": 1792628305.5984988,
-    "ast_hash": "a494b177442aad1e334573a98cb5aaed",
+    "mtime": 1792675218.691174,
+    "seen": 1792675806.1836433,
+    "ast_hash": "72fbaac81c1788a0911e9a7740e59da9",
     "semantic_hash": ""
   },
   "lib/locate.test.ts": {
@@ -348,9 +348,9 @@
     "semantic_hash": ""
   },
   "app/pdf/PdfStudio.tsx": {
-    "mtime": 1792633445.7238293,
-    "seen": 1792633783.3431547,
-    "ast_hash": "c7842d7079e73e3118aa1c96c2187eb7",
+    "mtime": 1792674519.2869673,
+    "seen": 1792674892.166213,
+    "ast_hash": "2609541669da98dad17e1dde45419b05",
     "semantic_hash": ""
   },
   "app/pdf/page.tsx": {
@@ -381,6 +381,18 @@
     "mtime": 1792632288.580689,
     "seen": 1792633783.3431547,
     "ast_hash": "ff3466fb1161256e164bbd9991f7b91e",
+    "semantic_hash": ""
+  },
+  "app/useMic.ts": {
+    "mtime": 1792635781.5330205,
+    "seen": 1792635887.8756888,
+    "ast_hash": "5b679dd95d5f0781e0fe6ad38f6e03d1",
+    "semantic_hash": ""
+  },
+  "lib/gemini.test.ts": {
+    "mtime": 1792675218.6941812,
+    "seen": 1792675806.1836433,
+    "ast_hash": "41359b4b19660d40ce7649b03f778c12",
     "semantic_hash": ""
   }
 }

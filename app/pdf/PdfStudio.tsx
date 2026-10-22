@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import Player from "../board/Player";
 import PdfPane from "./PdfPane";
 import AskBar, { type Lang } from "./AskBar";
+import { useMic } from "../useMic";
 import type { BoardScript } from "../../lib/board";
 import { pdfKey, savePdf, getPdf, listPdfs, saveLesson, listLessons, setLessonStep, getLastStyle, setLastStyle, type Lesson } from "../../lib/pdfstore";
 
@@ -31,14 +32,6 @@ export default function PdfStudio() {
   const cols = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState(0);
   const [doubt, setDoubt] = useState<Doubt | null>(null);
-  const drawer = useRef<HTMLDivElement>(null);
-  const doubtBtn = useRef<HTMLButtonElement>(null);
-  const doubtOpen = doubt !== null;
-  const wasOpen = useRef(false);
-  useEffect(() => { // focus moves into the drawer on open and back to the Doubt? button on close
-    if (doubtOpen) drawer.current?.focus(); else if (wasOpen.current) doubtBtn.current?.focus();
-    wasOpen.current = doubtOpen;
-  }, [doubtOpen]);
   const [doubtBusy, setDoubtBusy] = useState(false);
   const [doubtText, setDoubtText] = useState("");
   const [clips, setClips] = useState<(Blob | null)[]>();
@@ -59,6 +52,9 @@ export default function PdfStudio() {
   const meta = useRef({ question: "", style: "", page: 1, lang: "en" });
   const loadId = useRef(0);
   const shown = useRef(script); shown.current = script; // an unmounted Player's late clips must not land on the next lesson
+  const [srcOpen, setSrcOpen] = useState(true);
+  const openDoubt = () => setDoubt((d) => d ?? { question: "", script: null });
+  const { mic, micError, toggleMic } = useMic((t) => { setDoubtText((d) => (d ? d + " " : "") + t); openDoubt(); });
 
   // shortcut: storage failures (private mode, blocked IndexedDB) are swallowed so the lesson flow still works, upgrade if users need to know.
   useEffect(() => { listPdfs().then(setRecent).catch(() => {}); }, []);
@@ -191,20 +187,38 @@ export default function PdfStudio() {
     const r = cols.current!.getBoundingClientRect();
     setSplit(clamp((e.clientX - r.left) / r.width));
   }
+  const closeDoubt = () => { cancel(); setDoubt(null); setDoubtText(""); };
+  const pick = <input type="file" accept="application/pdf" hidden onChange={(e) => upload(e.target.files?.[0])} />;
+  const dock = (
+    <form className="dock" onSubmit={askDoubt}>
+      <button type="button" className="dock-pen" aria-label="Write your question" onClick={() => document.getElementById("doubt")?.focus()}>
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16zM14 6l4 4" /></svg>
+      </button>
+      <div className="dock-field">
+        <label htmlFor="doubt" className="sr-only">Your question</label>
+        <input id="doubt" placeholder="+ Type your question or response" maxLength={600} value={doubtText} onFocus={openDoubt} onChange={(e) => setDoubtText(e.target.value)} />
+        <button type="submit" className="dock-send" disabled={doubtBusy || !doubtText.trim()} aria-label={doubtBusy ? "Working" : "Send"}>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6" /></svg>
+        </button>
+      </div>
+      <button type="button" className={mic === "rec" ? "dock-mic rec" : "dock-mic"} onClick={toggleMic} disabled={mic === "busy"} aria-pressed={mic === "rec"} aria-label={mic === "rec" ? "Stop recording" : "Ask by voice"}>
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>
+      </button>
+      {(micError || (doubt && error)) && <p className="dock-error" role="alert">{micError || error}</p>}
+    </form>
+  );
   return (
     <div className="pdf-studio">
-      {file ? (
-        <label className="pill-btn pdf-upload">
-          Choose another PDF
-          <input type="file" accept="application/pdf" hidden onChange={(e) => upload(e.target.files?.[0])} />
-        </label>
-      ) : (
+      {!file && (
+        <div className="upload-card">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V4m-5 5 5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" /></svg>
+          <strong>No uploaded file</strong>
+          <p className="muted">Upload a PDF to view and use it in the lesson.</p>
+          <label className="upload-btn">Upload files{pick}</label>
+        </div>
+      )}
+      {!file && (
         <div className="study-tiles">
-          <label className="study-tile t-blue">
-            <strong>Upload a PDF</strong>
-            <span>Worksheets, notes or past papers</span>
-            <input type="file" accept="application/pdf" hidden onChange={(e) => upload(e.target.files?.[0])} />
-          </label>
           <a className="study-tile t-violet" href="/board"><strong>Whiteboard lesson</strong><span>Any topic, drawn step by step</span></a>
           <a className="study-tile t-green" href="/solve"><strong>Solve a question</strong><span>Type or snap it</span></a>
         </div>
@@ -216,41 +230,44 @@ export default function PdfStudio() {
         </section>
       )}
       {file && (
-        <>
-          <AskBar busy={busy || !ready} style={style} onStyle={setStyle} lang={lang} onLang={setLang} onAsk={ask} quoteMode={quoteMode} error={error || notice} />
-          <div className="pdf-cols" ref={cols}>
-            <motion.div className="pdf-col" initial={false} animate={{ flexBasis: `${share * 100}%` }} transition={{ duration: 0.5, ease: "easeInOut" }}>
-              <PdfPane file={file} page={page} onPage={changePage} bbox={bbox} renderRef={renderRef} onReady={setReady} saved={lessons.map((l) => ({ id: l.id, label: l.question, at: l.createdAt }))} onOpen={(id) => openLesson(lessons.find((l) => l.id === id)!)} />
-            </motion.div>
-            <div className="pdf-divider" role="separator" aria-orientation="vertical" aria-label="Resize PDF and board" aria-valuemin={20} aria-valuemax={80} aria-valuenow={Math.round(share * 100)} tabIndex={0}
-              onPointerDown={(e) => e.currentTarget.setPointerCapture(e.pointerId)}
-              onPointerMove={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) drag(e); }}
-              onKeyDown={(e) => { const d = e.key === "ArrowLeft" ? -0.05 : e.key === "ArrowRight" ? 0.05 : 0; if (d) { e.preventDefault(); setSplit((s) => clamp((s ?? share) + d)); } }} />
-            <motion.div className="pdf-col" initial={false} animate={{ flexBasis: `${(1 - share) * 100}%` }} transition={{ duration: 0.5, ease: "easeInOut" }}>
-              {script ? (
-                <>
-                  <div style={{ opacity: doubt ? 0.4 : 1 }}>
-                    <Player key={playKey} script={script} lang={meta.current.lang} paused={doubt ? true : undefined} startStep={start} onStep={onStep} clips={clips} onClips={onClips} />
+        <div className="pdf-cols" ref={cols}>
+          {srcOpen ? (
+            <>
+              <motion.div className="pdf-col src-panel" initial={false} animate={{ flexBasis: `${share * 100}%` }} transition={{ duration: 0.5, ease: "easeInOut" }}>
+                <header className="src-head">
+                  <div><p className="kicker">Course source</p><h2>Original materials</h2></div>
+                  <button type="button" className="stage-icon" onClick={() => setSrcOpen(false)} aria-label="Hide source panel">×</button>
+                </header>
+                <h3>Instructions</h3>
+                <p className={question ? "src-q" : "src-q muted"}>{question || "Ask about a question on the page below."}</p>
+                <AskBar busy={busy || !ready} style={style} onStyle={setStyle} lang={lang} onLang={setLang} onAsk={ask} quoteMode={quoteMode} error={doubt ? notice : error || notice} />
+                <PdfPane file={file} page={page} onPage={changePage} bbox={bbox} renderRef={renderRef} onReady={setReady} saved={lessons.map((l) => ({ id: l.id, label: l.question, at: l.createdAt }))} onOpen={(id) => openLesson(lessons.find((l) => l.id === id)!)} />
+                <label className="pill-btn pdf-upload">Replace file{pick}</label>
+              </motion.div>
+              <div className="pdf-divider" role="separator" aria-orientation="vertical" aria-label="Resize source and board" aria-valuemin={20} aria-valuemax={80} aria-valuenow={Math.round(share * 100)} tabIndex={0}
+                onPointerDown={(e) => e.currentTarget.setPointerCapture(e.pointerId)}
+                onPointerMove={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) drag(e); }}
+                onKeyDown={(e) => { const d = e.key === "ArrowLeft" ? -0.05 : e.key === "ArrowRight" ? 0.05 : 0; if (d) { e.preventDefault(); setSplit((s) => clamp((s ?? share) + d)); } }} />
+            </>
+          ) : (
+            <button type="button" className="pill-btn src-show" onClick={() => setSrcOpen(true)}>Show source</button>
+          )}
+          <motion.div className="pdf-col board-col" initial={false} animate={{ flexBasis: srcOpen ? `${(1 - share) * 100}%` : "100%" }} transition={{ duration: 0.5, ease: "easeInOut" }}>
+            {script ? (
+              <>
+                <Player key={playKey} script={script} lang={meta.current.lang} paused={doubt ? true : undefined} startStep={start} onStep={onStep} clips={clips} onClips={onClips} dock={dock}
+                  onEnd={() => { cancel(); setScript(null); setDoubt(null); setDoubtText(""); setLayout("reading"); }} />
+                {doubt?.script && (
+                  <div className="doubt-overlay" role="dialog" aria-label={`Answer: ${doubt.question}`}>
+                    <Player key={doubt.question} script={doubt.script} lang={lang} autoplay clips={undefined} onClips={() => {}} onEnd={closeDoubt} />
                   </div>
-                  {!doubt && <button type="button" className="btn ghost" ref={doubtBtn} onClick={() => setDoubt({ question: "", script: null })}>Doubt?</button>}
-                  {doubt && (
-                    <div className="pdf-drawer" ref={drawer} tabIndex={-1}>
-                      <form className="row" onSubmit={askDoubt}>
-                        <label htmlFor="doubt" className="sr-only">Your doubt</label>
-                        <input id="doubt" placeholder="What is confusing here?" maxLength={600} value={doubtText} onChange={(e) => setDoubtText(e.target.value)} />
-                        <button type="submit" className="btn" disabled={doubtBusy || !doubtText.trim()}>{doubtBusy ? "Working..." : "Ask"}</button>
-                        <button type="button" className="btn ghost" onClick={() => { cancel(); setDoubt(null); setDoubtText(""); }}>Close</button>
-                      </form>
-                      {doubt.script && <Player key={doubt.question} script={doubt.script} lang={lang} autoplay clips={undefined} onClips={() => {}} />}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <p className="muted">Ask about a question and its lesson shows up here.</p>
-              )}
-            </motion.div>
-          </div>
-        </>
+                )}
+              </>
+            ) : (
+              <p className="muted board-empty">Ask about a question and its lesson shows up here.</p>
+            )}
+          </motion.div>
+        </div>
       )}
     </div>
   );

@@ -1,11 +1,10 @@
 {
   "2": "solve/route.ts",
   "4": "PdfStudio.tsx",
-  "6": "react",
+  "6": "app/page.tsx",
   "7": "lesson.ts",
   "8": "PDF Section Design Spec",
   "9": "next-env.d.ts",
   "11": "PdfPane.tsx",
-  "12": "Player.tsx",
   "13": "CLAUDE.md"
 }

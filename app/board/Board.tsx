@@ -89,7 +89,7 @@ export default function Board({ steps, current, run, title, subtitle, delays, ho
     {/* HTML heading in normal flow above the drawing: survives every step, replay and camera move, never overlaps the model text */}
     <motion.div initial={{ opacity: lead ? 0 : 1 }} animate={{ opacity: 1 }} transition={{ delay: lead ? INTRO - 0.8 : 0, duration: 0.8 }}
       style={{ textAlign: "center", marginBottom: 6, fontFamily: "var(--hand)", lineHeight: 1.1, color: "var(--c-ink)" }}>
-      <div style={{ fontSize: "1.4rem", fontWeight: 700 }}>{title}</div>
+      <div style={{ fontSize: "1.4rem", fontWeight: 700, color: "var(--c-green)" }}>{title}</div>
       {subtitle && <div style={{ fontSize: "1rem", color: "var(--c-purple)" }}>{subtitle}</div>}
     </motion.div>
     <motion.svg className="board" initial={{ viewBox: `0 0 ${W} ${H}` }} animate={{ viewBox: box.join(" ") }}
@@ -119,7 +119,7 @@ export default function Board({ steps, current, run, title, subtitle, delays, ho
       {lead > 0 && (
         <motion.g initial={{ opacity: 1 }} animate={{ opacity: 0 }} transition={{ delay: INTRO - 0.8, duration: 0.8, ease: "easeInOut" }}
           style={{ pointerEvents: "none" }}>
-          <Typed x={W / 2} y={H / 2 - 10} text={title} size={64} color="ink" delay={0} dur={subtitle ? 1 : 1.5} bold />
+          <Typed x={W / 2} y={H / 2 - 10} text={title} size={64} color="green" delay={0} dur={subtitle ? 1 : 1.5} bold />
           {subtitle && <Typed x={W / 2} y={H / 2 + 50} text={subtitle} size={34} color="purple" delay={1} dur={0.5} />}
         </motion.g>
       )}
