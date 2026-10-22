@@ -27,6 +27,8 @@ export default function PdfStudio() {
   const [error, setError] = useState("");
   const [quoteMode, setQuoteMode] = useState(false);
   const [layout, setLayout] = useState<"reading" | "asking">("reading");
+  const [split, setSplit] = useState<number | null>(null); // PDF share set by the divider; overrides the layout until the next upload
+  const cols = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState(0);
   const [doubt, setDoubt] = useState<Doubt | null>(null);
   const [doubtBusy, setDoubtBusy] = useState(false);
@@ -58,7 +60,7 @@ export default function PdfStudio() {
     cancel(); const lid = ++loadId.current;
     setFile(bytes); setKey(""); setLessons([]); savedId.current = "";
     setPage(1); setBbox(null); setScript(null); setClips(undefined); setDoubt(null);
-    setQuoteMode(false); setError(""); setNotice(""); setLayout("reading");
+    setQuoteMode(false); setError(""); setNotice(""); setLayout("reading"); setSplit(null);
     try {
       const k = known ?? await pdfKey(bytes);
       if (!known) await savePdf(k, name, bytes).catch(() => {}); // lessons and style still load if the PDF can't be stored
@@ -166,6 +168,12 @@ export default function PdfStudio() {
   }
 
   const asking = layout === "asking";
+  const share = split ?? (asking ? 0.3 : 0.66);
+  const clamp = (n: number) => Math.min(0.8, Math.max(0.2, n));
+  function drag(e: React.PointerEvent) {
+    const r = cols.current!.getBoundingClientRect();
+    setSplit(clamp((e.clientX - r.left) / r.width));
+  }
   return (
     <div className="pdf-studio">
       <label className="btn ghost pdf-upload">
@@ -181,11 +189,15 @@ export default function PdfStudio() {
       {file && (
         <>
           <AskBar busy={busy || !ready} style={style} onStyle={setStyle} lang={lang} onLang={setLang} onAsk={ask} quoteMode={quoteMode} error={error || notice} />
-          <div className="pdf-cols">
-            <motion.div className="pdf-col" initial={false} animate={{ flexBasis: asking ? "30%" : "66%" }} transition={{ duration: 0.5, ease: "easeInOut" }}>
+          <div className="pdf-cols" ref={cols}>
+            <motion.div className="pdf-col" initial={false} animate={{ flexBasis: `${share * 100}%` }} transition={{ duration: 0.5, ease: "easeInOut" }}>
               <PdfPane file={file} page={page} onPage={changePage} bbox={bbox} renderRef={renderRef} onReady={setReady} saved={lessons.map((l) => ({ id: l.id, label: l.question }))} onOpen={(id) => openLesson(lessons.find((l) => l.id === id)!)} />
             </motion.div>
-            <motion.div className="pdf-col" initial={false} animate={{ flexBasis: asking ? "70%" : "34%" }} transition={{ duration: 0.5, ease: "easeInOut" }}>
+            <div className="pdf-divider" role="separator" aria-orientation="vertical" aria-label="Resize PDF and board" aria-valuemin={20} aria-valuemax={80} aria-valuenow={Math.round(share * 100)} tabIndex={0}
+              onPointerDown={(e) => e.currentTarget.setPointerCapture(e.pointerId)}
+              onPointerMove={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) drag(e); }}
+              onKeyDown={(e) => { const d = e.key === "ArrowLeft" ? -0.05 : e.key === "ArrowRight" ? 0.05 : 0; if (d) { e.preventDefault(); setSplit((s) => clamp((s ?? share) + d)); } }} />
+            <motion.div className="pdf-col" initial={false} animate={{ flexBasis: `${(1 - share) * 100}%` }} transition={{ duration: 0.5, ease: "easeInOut" }}>
               {script ? (
                 <>
                   <div style={{ opacity: doubt ? 0.4 : 1 }}>
