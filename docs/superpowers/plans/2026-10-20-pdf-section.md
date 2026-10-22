@@ -252,8 +252,11 @@ Look (all within the existing SVG, `viewBox` `0 0 W H`):
 **Interfaces:**
 - Consumes: `shapeDelays` (Task 2), `Board` `delays`/`subtitle` props (Task 5).
 - Produces:
-  - `loadClips(says: string[], speak: (text: string) => Promise<Blob | null>, stored?: (Blob | null)[]): Promise<Blob | null>[]` — one promise per step, all started at once. With `stored`, returns `stored` resolved and never calls `speak`. A rejected `speak` resolves to `null`.
-  - `Player` props: `{ script; autoplay?; bare?; clips?: (Blob | null)[]; onClips?: (clips: (Blob | null)[]) => void }`. Fetches via `loadClips` (the `speak` arg POSTs `/api/speak` as today), starts step 0 once clip 0 resolves, calls `onClips` once all settle. Step delays come from `shapeDelays(step, seconds)`, with `seconds` from the clip's `loadedmetadata`; when muted or the clip is `null`, `seconds = stepSeconds(step)`.
+  - `loadClips(says: string[], speak: (text: string) => Promise<Blob | null>, stored?: (Blob | null)[]): Promise<Blob | null>[]` — one promise per step. Clip 0 is fetched first; the rest start together only after clip 0 settles (so step 0 isn't slowed by the others). With `stored`, returns `stored` resolved and never calls `speak`. A rejected `speak` resolves to `null`.
+  - `Player` props: `{ script; autoplay?; bare?; clips?: (Blob | null)[]; onClips?: (clips: (Blob | null)[]) => void; startStep?: number; onStep?: (i: number) => void }`. Fetches via `loadClips` (the `speak` arg POSTs `/api/speak` as today), starts step `startStep ?? 0` once its clip resolves, calls `onClips` once all settle. Step delays come from `shapeDelays(step, seconds)`, with `seconds` from the clip's `loadedmetadata`; when muted or the clip is `null`, `seconds = stepSeconds(step)`.
+  - `startStep`: steps before it render as already drawn (no animation); that step plays from its start. `onStep(i)` fires each time step `i` starts.
+  - Pause control (spec "Interrupt, doubts and resume"): the step's `Audio` and its blob URL live in a ref; pause calls `audio.pause()`, resume calls `play()`. The advance timer stores its remaining ms on pause and restarts with them. CSS strokes freeze via `animation-play-state: paused` on the board. A framer move already running finishes on its own — mark it in code: `// shortcut: in-flight framer moves (<1s) finish while paused, set duration 0 when paused if visible`.
+  - Pause must also be drivable from outside (Task 7's doubt drawer): expose `paused?: boolean` as a controlled prop that, when defined, overrides the internal toggle.
   - Voice is **on** by default when `clips` or `onClips` is passed (the PDF page); `/board` keeps today's off-by-default.
 
 - [ ] **Step 1: Write the failing tests**
@@ -264,20 +267,23 @@ test("stored clips never call speak", async () => {
   const out = await Promise.all(loadClips(["a", "b"], async () => { calls++; return null; }, [b, null]));
   assert.equal(calls, 0); assert.deepEqual(out, [b, null]);
 });
-test("all clips start in parallel and failures become null", async () => {
+test("clip 0 goes first, the rest after it settles, failures become null", async () => {
   const started: string[] = [];
   const ps = loadClips(["a", "b", "c"], (t) => { started.push(t); return t === "b" ? Promise.reject(new Error("x")) : Promise.resolve(new Blob([t])); });
-  assert.deepEqual(started, ["a", "b", "c"]);
-  const out = await Promise.all(ps); assert.equal(out[1], null); assert.ok(out[0] instanceof Blob);
+  assert.deepEqual(started, ["a"]);
+  await ps[0];
+  const out = await Promise.all(ps);
+  assert.deepEqual(started.slice().sort(), ["a", "b", "c"]); // each called exactly once
+  assert.equal(out[1], null); assert.ok(out[0] instanceof Blob);
 });
 ```
 
 - [ ] **Step 2: Run** `node --test lib/clips.test.ts` — Expected: FAIL (module not found).
 - [ ] **Step 3: Implement** `loadClips`.
 - [ ] **Step 4: Run** `node --test lib/clips.test.ts` — Expected: PASS.
-- [ ] **Step 5: Implement** the Player changes (object URLs revoked on unmount; captions keep showing the current `say`).
+- [ ] **Step 5: Implement** the Player changes (object URLs revoked on unmount; captions keep showing the current `say`; Pause button, `paused`, `startStep`, `onStep`).
 - [ ] **Step 6: Run** `npm run build` — Expected: succeeds; `/board` still plays muted by default.
-- [ ] **Step 7: Commit** `feat(player): parallel clips and voice-synced shapes`
+- [ ] **Step 7: Commit** `feat(player): sequenced clips, voice-synced shapes, pause and resume`
 
 ---
 
@@ -285,15 +291,16 @@ test("all clips start in parallel and failures become null", async () => {
 
 **Files:**
 - Create: `app/pdf/page.tsx`, `app/pdf/PdfStudio.tsx`, `app/pdf/PdfPane.tsx`, `app/pdf/AskBar.tsx`, `lib/pdfrender.ts`, `lib/pdfrender.test.ts`
-- Modify: `app/Nav.tsx` (add `{ href: "/pdf", … }` tab), `app/layout.tsx:25` (footer link), `package.json` (`pdfjs-dist`)
+- Modify: `app/Nav.tsx` (add `{ href: "/pdf", … }` tab), `app/layout.tsx:25` (footer link), `package.json` (`pdfjs-dist`), `app/api/lesson/route.ts`, `lib/validate.ts`, `lib/validate.test.ts`, `lib/prompts.ts`, `lib/prompts.test.ts`
 
 **Interfaces:**
-- Consumes: `/api/locate` → `Located` (Task 3); `/api/lesson` with `{ topic, style, lang, fromQuestion: true }` → `{ script, fallback }` (Task 4); `Player` (Task 6); `LANGS`.
+- Consumes: `/api/locate` → `Located` (Task 3); `/api/lesson` with `{ topic, style, lang, fromQuestion: true }` → `{ script, fallback }` (Task 4); `Player` with `paused`/`onStep` (Task 6); `LANGS`.
+- Extends `/api/lesson`: an optional `doubt: { question: string; say: string; titles: string[]; prev?: string }` (each string trimmed and capped — `question`/`prev` at `MAX_TOPIC`, `say` at 600, at most 8 `titles` of 80 chars; anything malformed → `doubt` omitted). `LessonRequest` gains `doubt?: Doubt`. With `doubt`, `lessonSystem` adds a line: answer the student's doubt about the current step in 2–3 steps, same style and language, don't repeat earlier steps. Every lesson prompt gains next to "4-8 steps": each step's `say` is 15–20 seconds when spoken.
 - Produces:
   - `renderScale(pageWidthPt: number): number` = `Math.min(2, 1400 / pageWidthPt)`.
   - `PdfPane` props: `{ file: ArrayBuffer; page: number; onPage: (n: number) => void; bbox: [number, number, number, number] | null; renderRef: React.MutableRefObject<(() => Promise<string>) | null> }` — `renderRef.current()` returns the current page as a JPEG data URL (quality 0.85) at `renderScale`.
   - `AskBar` props: `{ busy: boolean; style: string; onStyle: (s: string) => void; lang: Lang; onLang: (l: Lang) => void; onAsk: (text: string) => void; quoteMode: boolean }` — chips (exact labels in Global Constraints; `Normal` sets `""`), free-text style input, language select, mic (same `/api/listen` pattern as `app/solve/Solver.tsx`), text input. Ask disabled while `busy`.
-  - `PdfStudio` state: `file`, `page`, `bbox`, `script`, `busy`, `error`, `quoteMode`, `layout: "reading" | "asking"`.
+  - `PdfStudio` state: `file`, `page`, `bbox`, `script`, `busy`, `error`, `quoteMode`, `layout: "reading" | "asking"`, `step` (from `onStep`), `doubt: { question: string; script: BoardScript | null } | null`.
 
 pdfjs setup in `PdfPane` (client-only, dynamic import):
 ```ts
@@ -305,7 +312,12 @@ Ask flow in `PdfStudio`:
 1. If `quoteMode`, the typed text is the question; skip to 3.
 2. `POST /api/locate { image: await renderRef.current(), ask }`. `{missing:true}` → set `quoteMode`, show "Couldn't find that on this page — type or paste the question's line." and stop. Otherwise set `bbox`.
 3. `POST /api/lesson { topic: question, style, lang, fromQuestion: true }` → `script`; `layout = "asking"`.
-4. Render `<Player script={script} onClips={…} />`. Any non-OK response → `error` shown in the ask bar, `busy` cleared.
+4. Render `<Player script={script} paused={doubt !== null} onStep={setStep} onClips={…} />`. Any non-OK response → `error` shown in the ask bar, `busy` cleared.
+
+Doubt flow in `PdfStudio` (one level only):
+1. A "Doubt?" button under the board opens a drawer with a text input. Opening it sets `doubt`, which pauses the main Player; the main Player stays mounted and dims (`opacity: 0.4`).
+2. Submitting `POST /api/lesson { topic: question, style, lang, doubt: { question: typed, say: script.steps[step].say, titles: script.steps.slice(0, step + 1).map(s => s.title), prev: doubt.question if one was already answered } }` → `doubt.script`, rendered in the drawer as a second `<Player script={doubt.script} autoplay />`.
+3. Asking again replaces the open doubt. Closing the drawer sets `doubt = null`; the main Player resumes where it stopped.
 
 Layout C (desktop): framer-motion animates the two columns' `flexBasis` — reading `66% / 34%`, asking `30% / 70%`.
 
@@ -321,11 +333,38 @@ test("renderScale caps at 2x and keeps big pages near 1400px wide", () => {
 
 - [ ] **Step 2: Run** `node --test lib/pdfrender.test.ts` — Expected: FAIL.
 - [ ] **Step 3: Implement** `renderScale`; **Run** again — Expected: PASS.
-- [ ] **Step 4: Install** `npm install pdfjs-dist` (approved).
-- [ ] **Step 5: Implement** the four `app/pdf/*` files and the Nav/footer links.
-- [ ] **Step 6: Run** `npm run build` — Expected: succeeds, `/pdf` listed as a page.
-- [ ] **Step 7: Check** in the browser pane (no live API calls): upload a local PDF, flip pages, chips toggle, ask button disables while busy. Expected: page renders crisply; console free of worker errors.
-- [ ] **Step 8: Commit** `feat(pdf): upload, locate, styled narrated lesson`
+- [ ] **Step 4: Write the failing tests** for the doubt payload and prompt lines
+
+```ts
+// lib/validate.test.ts
+test("doubt payload is trimmed, capped and optional", () => {
+  const r = parseLessonRequest({ topic: "Q3", doubt: { question: " why? ", say: "x".repeat(900), titles: Array(12).fill("t"), prev: "how?" } });
+  assert.equal(r?.doubt?.question, "why?");
+  assert.equal(r?.doubt?.say.length, 600);
+  assert.equal(r?.doubt?.titles.length, 8);
+  assert.equal(r?.doubt?.prev, "how?");
+  assert.equal(parseLessonRequest({ topic: "Q3" })?.doubt, undefined);
+  assert.equal(parseLessonRequest({ topic: "Q3", doubt: { question: "" } })?.doubt, undefined);
+});
+
+// lib/prompts.test.ts
+test("every lesson caps each step at 15-20 seconds", () => {
+  assert.match(lessonSystem(base), /15-20 seconds/);
+});
+test("a doubt asks for 2-3 steps about the current step", () => {
+  const p = lessonSystem({ ...base, doubt: { question: "why?", say: "s", titles: ["a"] } });
+  assert.match(p, /2-3 steps/);
+  assert.doesNotMatch(lessonSystem(base), /2-3 steps/);
+});
+```
+(`base` = the options object the existing prompt tests already use.)
+
+- [ ] **Step 5: Run** `node --test lib/validate.test.ts lib/prompts.test.ts` — Expected: FAIL. **Implement** `doubt` in `validate.ts`, `prompts.ts` and the route (pass it through to `lessonSystem`, put the doubt text in the user message); **Run** again — Expected: PASS.
+- [ ] **Step 6: Install** `npm install pdfjs-dist` (approved).
+- [ ] **Step 7: Implement** the four `app/pdf/*` files (including the doubt drawer) and the Nav/footer links.
+- [ ] **Step 8: Run** `npm run build` — Expected: succeeds, `/pdf` listed as a page.
+- [ ] **Step 9: Check** in the browser pane (no live API calls): upload a local PDF, flip pages, chips toggle, ask button disables while busy, "Doubt?" opens and closes the drawer. Expected: page renders crisply; console free of worker errors.
+- [ ] **Step 10: Commit** `feat(pdf): upload, locate, styled narrated lesson`
 
 ---
 
@@ -336,16 +375,17 @@ test("renderScale caps at 2x and keeps big pages near 1400px wide", () => {
 - Modify: `app/pdf/PdfStudio.tsx`, `app/pdf/PdfPane.tsx` (Saved ▾ button)
 
 **Interfaces:**
-- Consumes: `BoardScript`, `Player` `clips`/`onClips` (Task 6).
+- Consumes: `BoardScript`, `Player` `clips`/`onClips`/`startStep`/`onStep` (Task 6).
 - Produces (`lib/pdfstore.ts`, IndexedDB database `stepwise-pdf`, stores `pdfs` (key `key`), `lessons` (key `id`, index `pdfKey`), `prefs` (key `pdfKey`)):
-  - `type Lesson = { id: string; pdfKey: string; question: string; style: string; page: number; lang: string; script: BoardScript; clips: (Blob | null)[]; createdAt: number }`
+  - `type Lesson = { id: string; pdfKey: string; question: string; style: string; page: number; lang: string; script: BoardScript; clips: (Blob | null)[]; step: number; createdAt: number }` — new lessons save `step: 0`.
   - `pdfKey(bytes: ArrayBuffer): Promise<string>` — SHA-256 hex via `crypto.subtle.digest`.
   - `savePdf(key: string, name: string, bytes: ArrayBuffer): Promise<void>`; `getPdf(key: string): Promise<{ name: string; bytes: ArrayBuffer } | null>`
   - `saveLesson(l: Lesson): Promise<boolean>` — `false` on `QuotaExceededError` (UI shows "Lesson not saved — browser storage is full."), rethrows others.
   - `listLessons(key: string): Promise<Lesson[]>` — newest `createdAt` first.
+  - `setLessonStep(id: string, step: number): Promise<void>` — read-modify-write of one lesson; missing id is a no-op.
   - `getLastStyle(key: string): Promise<string>` (default `""`); `setLastStyle(key: string, style: string): Promise<void>`
 
-Flow: on upload, `pdfKey` → `savePdf` → load `getLastStyle` into the ask bar and `listLessons` into Saved ▾. After a lesson's `onClips` fires, `saveLesson` and `setLastStyle`. Picking a Saved entry sets `page`, and renders `<Player script={l.script} clips={l.clips} />` — no `/api/lesson` or `/api/speak` calls. A "Recent PDFs" list on the empty state reopens stored PDFs via `getPdf`.
+Flow: on upload, `pdfKey` → `savePdf` → load `getLastStyle` into the ask bar and `listLessons` into Saved ▾. After a lesson's `onClips` fires, `saveLesson` and `setLastStyle`. Picking a Saved entry sets `page`, and renders `<Player script={l.script} clips={l.clips} startStep={l.step} onStep={(i) => setLessonStep(l.id, i)} />` — no `/api/lesson` or `/api/speak` calls. A "Recent PDFs" list on the empty state reopens stored PDFs via `getPdf`.
 
 - [ ] **Step 1: Write the failing test** (hash only; IndexedDB is browser-checked)
 
@@ -360,7 +400,7 @@ test("pdfKey is the SHA-256 hex of the bytes", async () => {
 - [ ] **Step 3: Implement** `lib/pdfstore.ts` (`indexedDB` touched only inside functions so the module imports under node).
 - [ ] **Step 4: Run** `node --test lib/pdfstore.test.ts` — Expected: PASS.
 - [ ] **Step 5: Wire** storage into `PdfStudio` / `PdfPane`.
-- [ ] **Step 6: Check** in the browser pane with network inspection: replay a saved lesson. Expected: zero requests to `/api/lesson` and `/api/speak`; reload page → PDF and Saved list still there.
+- [ ] **Step 6: Check** in the browser pane with network inspection: replay a saved lesson. Expected: zero requests to `/api/lesson` and `/api/speak`; reload page → PDF and Saved list still there; reopen a lesson left mid-way → it starts at the saved step.
 - [ ] **Step 7: Commit** `feat(pdf): save PDFs and lessons per file, replay free`
 
 ---
@@ -372,11 +412,11 @@ test("pdfKey is the SHA-256 hex of the bytes", async () => {
 
 **Interfaces:**
 - Consumes: `layout` state (Task 7).
-- Produces: `split: number | null` state (PDF share, `0.2..0.8`). Dragging the divider (pointer events, `role="separator"`, `aria-orientation="vertical"`, arrow keys move it 5%) sets `split`, which overrides Layout C until the next upload. Below 768px wide (`@media (max-width: 767px)`): columns stack, PDF on top (max `50vh`), board below, divider hidden.
+- Produces: `split: number | null` state (PDF share, `0.2..0.8`). Dragging the divider (pointer events, `role="separator"`, `aria-orientation="vertical"`, arrow keys move it 5%) sets `split`, which overrides Layout C until the next upload. Below 768px wide (`@media (max-width: 767px)`): columns stack, PDF on top (max `50vh`), board below, divider hidden; the doubt drawer becomes a bottom sheet (fixed, full width, max `60vh`).
 
 - [ ] **Step 1: Implement** the divider and media query.
 - [ ] **Step 2: Run** `npm run build` — Expected: succeeds.
-- [ ] **Step 3: Check** in the browser pane at desktop and the `mobile` preset: divider drags and responds to arrow keys; phone shows PDF above board with no horizontal scroll.
+- [ ] **Step 3: Check** in the browser pane at desktop and the `mobile` preset: divider drags and responds to arrow keys; phone shows PDF above board with no horizontal scroll and the doubt drawer as a bottom sheet. Also: Pause stops strokes and voice and Resume continues from the same point; closing a doubt resumes the main Player; after a reload, a reopened lesson shows earlier steps already drawn.
 - [ ] **Step 4: Commit** `feat(pdf): draggable divider and phone stacking`
 
 ---

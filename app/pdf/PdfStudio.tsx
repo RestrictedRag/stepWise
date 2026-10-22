@@ -193,15 +193,27 @@ export default function PdfStudio() {
   }
   return (
     <div className="pdf-studio">
-      <label className="btn ghost pdf-upload">
-        {file ? "Choose another PDF" : "Upload a PDF"}
-        <input type="file" accept="application/pdf" hidden onChange={(e) => upload(e.target.files?.[0])} />
-      </label>
-      {!file && recent.length > 0 && (
-        <div>
-          <h2>Recent PDFs</h2>
-          <ul>{recent.map((r) => <li key={r.key}><button type="button" className="btn ghost" onClick={() => reopen(r.key)}>{r.name}</button></li>)}</ul>
+      {file ? (
+        <label className="pill-btn pdf-upload">
+          Choose another PDF
+          <input type="file" accept="application/pdf" hidden onChange={(e) => upload(e.target.files?.[0])} />
+        </label>
+      ) : (
+        <div className="study-tiles">
+          <label className="study-tile t-blue">
+            <strong>Upload a PDF</strong>
+            <span>Worksheets, notes or past papers</span>
+            <input type="file" accept="application/pdf" hidden onChange={(e) => upload(e.target.files?.[0])} />
+          </label>
+          <a className="study-tile t-violet" href="/board"><strong>Whiteboard lesson</strong><span>Any topic, drawn step by step</span></a>
+          <a className="study-tile t-green" href="/solve"><strong>Solve a question</strong><span>Type or snap it</span></a>
         </div>
+      )}
+      {!file && recent.length > 0 && (
+        <section className="jump-back">
+          <h2>Jump back in</h2>
+          <ul>{recent.map((r) => <li key={r.key}><button type="button" className="jump-card" onClick={() => reopen(r.key)}><span className="doc-ic" aria-hidden="true">PDF</span>{r.name}</button></li>)}</ul>
+        </section>
       )}
       {file && (
         <>

@@ -22,10 +22,13 @@ export function extractJson(text: string): unknown {
   return JSON.parse(t.slice(a, b + 1));
 }
 
-function tryParse(text: string): { script: BoardScript } | { error: string } {
+function tryParse(text: string, minSteps: number): { script: BoardScript } | { error: string } {
   try {
     const r = parseBoardScript(extractJson(text));
-    return r.error ? { error: r.error } : { script: r.script! };
+    if (r.error) return { error: r.error };
+    // a valid but 1-step script is a cut-short lesson; send it back for the full 4-8 steps
+    if (r.script!.steps.length < minSteps) return { error: `It has only ${r.script!.steps.length} step(s); give ${minSteps}-8 full steps.` };
+    return { script: r.script! };
   } catch (e) {
     return { error: (e as Error).message };
   }
@@ -45,13 +48,14 @@ export async function generateLesson(req: LessonRequest, ask: (m: Msg[]) => Prom
     { role: "system", content: lessonSystem(req) },
     { role: "user", content: req.doubt ? doubtMessage(req) : `Topic: ${req.topic}` },
   ];
+  const minSteps = req.doubt ? 1 : 3;
   let reply = "";
   try {
     reply = await ask(messages);
-    let r = tryParse(reply);
+    let r = tryParse(reply, minSteps);
     if ("error" in r) {
       reply = await ask([...messages, { role: "assistant", content: reply }, { role: "user", content: `That was not a valid board script: ${r.error} Reply with the corrected JSON object only.` }]);
-      r = tryParse(reply);
+      r = tryParse(reply, minSteps);
     }
     if ("script" in r) return { script: r.script, fallback: false };
   } catch (e) {

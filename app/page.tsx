@@ -7,6 +7,13 @@ import pythagoras from "../lib/fixtures/pythagoras.json";
 
 const SUBJECTS = ["Algebra", "Geometry", "Calculus", "Physics", "Chemistry", "Biology", "Statistics", "Trigonometry", "Word problems", "Earth science"];
 
+const EXAMPLES = [
+  ["Math", "#1677ff", "Solve 2x² − 8x + 6 = 0 and explain each step"],
+  ["Physics", "#7a5cff", "A ball is dropped from 20 m. How long until it lands?"],
+  ["Chemistry", "#00a870", "Balance: Fe + O₂ → Fe₂O₃"],
+  ["Biology", "#ff7a1f", "Explain how mitosis differs from meiosis"],
+];
+
 const WHY = [
   ["Step-by-step solutions for any subject", "From linear equations to stoichiometry, every move is written out with the reason it works."],
   ["Visual explanations that stick", "The whiteboard tutor draws the idea stroke by stroke, so you see the method, not just read it."],
@@ -19,14 +26,33 @@ export default function Home() {
   return (
     <main>
       <ScrollReveal />
+      <Link className="top-link" href="/solve">History</Link>
       <Hero>
         <h1>
-          <span className="line"><span className="hero-line">Instant AI</span></span>
-          <span className="line"><span className="hero-line"><span className="mark">homework helper</span></span></span>
-          <span className="line"><span className="hero-line">with explanations</span></span>
+          <span className="line"><span className="hero-line">StepWise: Your</span></span>
+          <span className="line"><span className="hero-line"><span className="mark">AI Study Companion</span></span></span>
         </h1>
+        {/* shortcut: modes are decorative, only Study exists; wire them up when Exam Prep / Writing ship */}
+        <div className="seg" aria-hidden="true"><span className="on">Study</span><span>Exam Prep</span><span>Writing</span></div>
+        <div className="tool-card">
+          <nav className="tool-chips" aria-label="Tools">
+            <Link className="tool-chip on" href="/solve">AI Solver</Link>
+            <Link className="tool-chip" href="/board">Whiteboard Tutor</Link>
+            <Link className="tool-chip" href="/pdf">AI Study</Link>
+          </nav>
+          <Link className="tool-prompt" href="/solve">Type or upload your question and get step-by-step help…</Link>
+        </div>
         <p className="lead">Understand tough problems with clear, visual, step-by-step solutions and finish assignments with confidence.</p>
         <Link className="btn big" href="/solve">Solve your homework</Link>
+        <div className="examples">
+          {EXAMPLES.map(([tag, color, q]) => (
+            <Link key={q} className="example" href="/solve" data-reveal>
+              <span className="thumb" style={{ background: color }} aria-hidden="true">{q.slice(0, 18)}</span>
+              <span className="subj" style={{ color }}>{tag}</span>
+              <span className="ex-q">{q}</span>
+            </Link>
+          ))}
+        </div>
         <div className="showcase">
           <figure className="frame">
             {script && <Player script={script} autoplay bare />}
@@ -120,6 +146,10 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <Link className="chat-bubble" href="/solve" aria-label="Ask a question">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" /></svg>
+      </Link>
 
       <section className="cta" aria-labelledby="cta-title">
         <div className="cta-card">

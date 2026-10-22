@@ -65,7 +65,7 @@ export default function AskBar({ busy, style, onStyle, lang, onLang, onAsk, quot
     <form className="solver ask-bar" onSubmit={submit}>
       <div className="chips" role="group" aria-label="Narration style">
         {STYLES.map(([label, v]) => (
-          <button key={label} type="button" className="btn ghost" aria-pressed={style === v} onClick={() => onStyle(v)}>{label}</button>
+          <button key={label} type="button" className="pill-btn" aria-pressed={style === v} onClick={() => onStyle(v)}>{label}</button>
         ))}
       </div>
       <div className="panel">
@@ -74,7 +74,7 @@ export default function AskBar({ busy, style, onStyle, lang, onLang, onAsk, quot
         <div className="row">
           <label>Own style <input aria-label="Custom style" placeholder="e.g. pirate" maxLength={80} value={preset ? "" : style} onChange={(e) => onStyle(e.target.value)} /></label>
           <label>Language <select value={lang} onChange={(e) => onLang(e.target.value as Lang)}>{LANGS.map((l) => <option key={l} value={l}>{LANG_LABEL[l]}</option>)}</select></label>
-          <button type="button" className="btn ghost" aria-pressed={mic === "rec"} disabled={mic === "busy"} onClick={toggleMic}>
+          <button type="button" className="pill-btn mic" aria-pressed={mic === "rec"} disabled={mic === "busy"} onClick={toggleMic}>
             {mic === "rec" ? "Stop" : mic === "busy" ? "Listening..." : "Speak"}
           </button>
           <button type="submit" className="btn" disabled={busy || !text.trim()}>{busy ? "Working..." : "Ask"}</button>
