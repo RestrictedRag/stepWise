@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import TopBar from "../../shell/TopBar";
 import LoadingCard from "./LoadingCard";
+import BoardSurface from "./BoardSurface";
 import { getEntry, type Entry } from "../../../lib/history";
 import type { BoardScript } from "../../../lib/board";
 
@@ -17,6 +18,7 @@ export default function Lesson({ id }: { id: string }) {
   const [entry, setEntry] = useState<Entry | null | undefined>(undefined);
   const [lesson, setLesson] = useState<LessonState>({ script: null, step: 0, playing: false, asks: [] });
   const [fail, setFail] = useState<string | null>(null);
+  const [follow, setFollow] = useState(true);
   const run = useRef(0);
 
   async function load(e: Entry) {
@@ -69,13 +71,20 @@ export default function Lesson({ id }: { id: string }) {
 
   if (!lesson.script) return <>{bar}<LoadingCard /></>;
 
-  // placeholder: board, source panel and bottom bar arrive in Tasks 9–11
+  const { script, step } = lesson;
+  const go = (n: number) => { setLesson((l) => ({ ...l, step: Math.max(0, Math.min(script.steps.length - 1, n)) })); setFollow(true); };
+  // shortcut: clip length estimated from text until Task 11 wires real audio
+  const clipSeconds = Math.max(2, script.steps[step].say.length / 15);
   return (
     <>
       {bar}
-      <main style={{ padding: 24 }} data-lesson>
-        <h2 style={{ fontSize: 18 }}>{entry.prompt}</h2>
-        <p style={{ color: "var(--muted)" }}>{lesson.script.steps.length} steps</p>
+      <main style={{ height: "calc(100vh - 56px)", display: "flex", flexDirection: "column" }} data-lesson>
+        <BoardSurface script={script} step={step} clipSeconds={clipSeconds} follow={follow} onFollowChange={setFollow} />
+        <div style={{ display: "flex", gap: 8, justifyContent: "center", padding: 8, borderTop: "1px solid var(--line)" }}>
+          <button style={btn} onClick={() => go(step - 1)} disabled={step === 0}>Prev</button>
+          <span style={{ alignSelf: "center" }}>{step + 1} / {script.steps.length}</span>
+          <button style={btn} onClick={() => go(step + 1)} disabled={step === script.steps.length - 1}>Next</button>
+        </div>
       </main>
     </>
   );
