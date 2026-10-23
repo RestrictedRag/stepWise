@@ -8,6 +8,7 @@ import { getEntry, newEntry, saveEntry, type Entry, type Mode } from "../../lib/
 import { hrefFor } from "../../lib/modes";
 import { mathText } from "../../lib/mathtext";
 import { parseAnswer, type Parsed } from "../../lib/answer";
+import Flashcards from "./Flashcards";
 
 const STATUS = ["Reading your question…", "Solving step by step…"];
 const btn = { border: "1px solid var(--line)", background: "var(--bg)", borderRadius: 8, padding: "6px 12px", cursor: "pointer", color: "var(--text)" } as const;
@@ -146,6 +147,8 @@ export default function Chat({ id }: { id: string }) {
           </>
         )}
 
+        {entry.mode === "flashcards" && <Flashcards topic={entry.prompt} />}
+
         {error && (
           <p style={{ color: "#c0392b" }}>
             {fail || "Couldn't finish solving."}{" "}
@@ -166,7 +169,7 @@ export default function Chat({ id }: { id: string }) {
               <button style={btn} onClick={() => go("solver", "Quiz me on: " + entry.prompt)}>Quiz me</button>
               <button style={btn} onClick={() => go("solver", "Explain simpler: " + entry.prompt)}>Explain simpler</button>
             </div>
-            {cards && <p style={{ color: "var(--muted)" }}>Flashcards coming soon.</p>}
+            {cards && entry.mode !== "flashcards" && <Flashcards topic={entry.prompt} />}
           </>
         )}
       </main>
