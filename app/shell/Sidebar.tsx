@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { listEntries, type Entry } from "../../lib/history";
+import { hrefFor } from "../../lib/modes";
 
 const icon = (d: string): ReactNode => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -21,8 +22,6 @@ const NAV: { label: string; icon: ReactNode; mode?: string; badge?: string }[] =
   { label: "Study Guide", icon: icon("M4 5h11a3 3 0 0 1 3 3v12H7a3 3 0 0 1-3-3zM18 8h2v12"), mode: "guide" },
 ];
 
-// shortcut: duplicate of hrefFor, swap to lib/modes.ts once Task 4 lands
-const hrefOf = (e: Entry) => (e.mode === "whiteboard" ? `/home/whiteboard-tutor/${e.id}` : `/chat/${e.id}`);
 
 const row = { display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, fontSize: 14, color: "var(--text)", textDecoration: "none" } as const;
 
@@ -69,7 +68,7 @@ export default function Sidebar({ collapsed, onToggle }: { collapsed: boolean; o
         <div style={{ marginTop: 18, minHeight: 0, overflow: "auto" }}>
           <div style={{ fontSize: 12, color: "var(--muted)", padding: "0 10px 6px" }}>History</div>
           {history.map((e) => (
-            <Link key={e.id} href={hrefOf(e)} className="nav-item" style={{ ...row, display: "block", padding: "6px 10px", fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            <Link key={e.id} href={hrefFor(e)} className="nav-item" style={{ ...row, display: "block", padding: "6px 10px", fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {e.prompt || "Untitled"}
             </Link>
           ))}
