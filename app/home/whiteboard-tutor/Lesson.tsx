@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import TopBar from "../../shell/TopBar";
 import LoadingCard from "./LoadingCard";
 import BoardSurface from "./BoardSurface";
+import SourcePanel from "./SourcePanel";
 import { getEntry, type Entry } from "../../../lib/history";
 import type { BoardScript } from "../../../lib/board";
 
@@ -79,7 +80,10 @@ export default function Lesson({ id }: { id: string }) {
     <>
       {bar}
       <main style={{ height: "calc(100vh - 56px)", display: "flex", flexDirection: "column" }} data-lesson>
-        <BoardSurface script={script} step={step} clipSeconds={clipSeconds} follow={follow} onFollowChange={setFollow} />
+        <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+          <SourcePanel />
+          <BoardSurface script={script} step={step} clipSeconds={clipSeconds} follow={follow} onFollowChange={setFollow} />
+        </div>
         <div style={{ display: "flex", gap: 8, justifyContent: "center", padding: 8, borderTop: "1px solid var(--line)" }}>
           <button style={btn} onClick={() => go(step - 1)} disabled={step === 0}>Prev</button>
           <span style={{ alignSelf: "center" }}>{step + 1} / {script.steps.length}</span>
