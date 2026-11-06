@@ -9,9 +9,9 @@ const PANEL = 1040;
 const clamp = (v: number) => Math.min(3, Math.max(0.25, v));
 const pill = { border: "1px solid var(--line)", background: "var(--bg)", borderRadius: 999, padding: "6px 14px", cursor: "pointer", color: "var(--text)" } as const;
 
-type Props = { script: BoardScript; step: number; clipSeconds: number; follow: boolean; onFollowChange: (f: boolean) => void };
+type Props = { script: BoardScript; step: number; clipSeconds: number; follow: boolean; onFollowChange: (f: boolean) => void; asks?: { at: number; text: string }[] };
 
-export default function BoardSurface({ script, step, clipSeconds, follow, onFollowChange }: Props) {
+export default function BoardSurface({ script, step, clipSeconds, follow, onFollowChange, asks }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [cam, setCam] = useState({ x: 0, y: 0, s: 1 });
@@ -92,6 +92,13 @@ export default function BoardSurface({ script, step, clipSeconds, follow, onFoll
                   <g key={`${step}-${j}`} className={isStroke(s) ? "draw" : "fade"} style={{ animationDelay: `${delays[j] ?? 0}s` }}>{renderShape(s)}</g>
                 ),
               )}
+            </g>
+          ))}
+          {asks?.map((a, k) => (
+            <g key={"ask" + k} transform={`translate(${a.at * PANEL + 40},130)`}>
+              <rect width={360} height={56} rx={12} fill="var(--bg)" stroke="var(--line)" />
+              <text x={14} y={20} fontSize={11} fill="var(--muted)">YOUR QUESTION</text>
+              <text x={14} y={42} fontSize={15} fill="var(--text)">{a.text}</text>
             </g>
           ))}
         </g>
