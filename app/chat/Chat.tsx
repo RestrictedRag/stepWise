@@ -80,7 +80,6 @@ export default function Chat({ id }: { id: string }) {
           <button style={btn}>Review later</button>
           <button style={btn}>History</button>
           <button style={btn} onClick={() => router.push("/")}>New question</button>
-          <button style={{ ...btn, background: "var(--blue)", color: "#fff", border: "none" }}>Upgrade</button>
         </>
       }
     />

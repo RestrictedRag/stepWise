@@ -41,9 +41,11 @@ export default function Sidebar({ collapsed, onToggle }: { collapsed: boolean; o
     <aside style={{ width: collapsed ? 64 : 260, flexShrink: 0, background: "var(--side)", borderRight: "1px solid var(--line)", display: "flex", flexDirection: "column", padding: "14px 10px", transition: "width .2s" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 4px 14px" }}>
         {!collapsed && (
-          <Link href="/" style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, color: "var(--text)", textDecoration: "none", fontWeight: 700, fontSize: 17 }}>
-            <span style={{ width: 28, height: 28, borderRadius: 7, background: "var(--blue)", color: "#fff", display: "grid", placeItems: "center", fontSize: 15, fontWeight: 800 }}>S</span>
-            Solvely
+          <Link href="/" aria-label="StepWise home" style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, color: "var(--text)", textDecoration: "none", fontWeight: 900, fontSize: 19 }}>
+            <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true" style={{ color: "var(--ink-orange)" }}>
+              <path d="M3 21h6v-6h6V9h6V3" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <strong>step<span style={{ color: "var(--ink-orange)" }}>Wise</span></strong>
           </Link>
         )}
         <button className="nav-item" onClick={onToggle} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} style={{ ...row, padding: 6, border: 0, background: "none", cursor: "pointer", color: "var(--muted)" }}>
@@ -79,8 +81,6 @@ export default function Sidebar({ collapsed, onToggle }: { collapsed: boolean; o
 
       {!collapsed && (
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {/* visual only: no payments in scope */}
-          <button style={{ flex: 1, height: 40, border: 0, borderRadius: 10, background: "var(--blue)", color: "#fff", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Upgrade</button>
           <button aria-label="Theme" className="nav-item" style={{ ...row, padding: 8, border: 0, background: "none", cursor: "pointer", color: "var(--muted)" }}>
             {icon("M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z")}
           </button>
