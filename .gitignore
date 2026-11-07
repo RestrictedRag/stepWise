@@ -7,3 +7,5 @@ services/aligner/.venv/
 .venv/
 __pycache__/
 *.pyc
+graphify-out/
+*.tsbuildinfo
