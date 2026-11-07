@@ -7,6 +7,12 @@ const LANG_CODE: Record<string, string> = {
   hi: "hi-IN",
   kn: "kn-IN",
   ta: "ta-IN",
+  te: "te-IN",
+  ml: "ml-IN",
+  mr: "mr-IN",
+  bn: "bn-IN",
+  gu: "gu-IN",
+  ur: "ur-IN",
 };
 
 export class GnaniTtsProvider implements TtsProvider {

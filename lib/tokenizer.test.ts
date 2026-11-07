@@ -23,36 +23,31 @@ test("tokenizeScript handles Hindi (Devanagari)", () => {
   assert.ok(idx !== null && idx >= 0);
 });
 
-test("tokenizeScript handles Chinese with character span mapping", () => {
-  const text = "细胞的核心是细胞核。";
-  const zhRes = tokenizeScript(text, "zh");
-  assert.ok(zhRes.tokens.length >= 3);
+test("tokenizeScript handles Tamil (Dravidian script)", () => {
+  const text = "செல்லின் கட்டுப்பாட்டு மையம் உட்கரு ஆகும்.";
+  const taRes = tokenizeScript(text, "ta");
+  assert.ok(taRes.tokens.length >= 4);
+  assert.equal(taRes.tokens[0].text, "செல்லின்");
 
-  // Check character span mapping
-  const firstToken = zhRes.tokens[0];
-  assert.ok(firstToken.characterSpans.length > 0);
-  assert.equal(firstToken.characterSpans[0].char, text[firstToken.startChar]);
-
-  const zhIdx = findTermWordIndex(zhRes.tokens, "细胞核", "zh");
-  assert.ok(zhIdx !== null && zhIdx >= 0);
+  const taIdx = findTermWordIndex(taRes.tokens, "உட்கரு", "ta");
+  assert.ok(taIdx !== null && taIdx >= 0);
 });
 
-test("tokenizeScript handles Japanese with character span mapping", () => {
-  const text = "細胞の中心には核があります。";
-  const jaRes = tokenizeScript(text, "ja");
-  assert.ok(jaRes.tokens.length >= 3);
+test("tokenizeScript handles Kannada and Telugu", () => {
+  const knText = "ಜೀವಕೋಶದ ನಿಯಂತ್ರಣ ಕೇಂದ್ರ ನ್ಯೂಕ್ಲಿಯಸ್ ಆಗಿದೆ.";
+  const knRes = tokenizeScript(knText, "kn");
+  assert.ok(knRes.tokens.length >= 4);
+  assert.equal(knRes.tokens[0].text, "ಜೀವಕೋಶದ");
 
-  const nucleusToken = jaRes.tokens.find((t) => t.text === "核");
-  assert.ok(nucleusToken);
-  assert.equal(nucleusToken.characterSpans[0].char, "核");
-
-  const jaIdx = findTermWordIndex(jaRes.tokens, "核", "ja");
-  assert.ok(jaIdx !== null && jaIdx >= 0);
+  const teText = "కణం యొక్క నియంత్రణ కేంద్రం కేంద్రకం.";
+  const teRes = tokenizeScript(teText, "te");
+  assert.ok(teRes.tokens.length >= 4);
+  assert.equal(teRes.tokens[0].text, "కణం");
 });
 
-test("tokenizeScript handles RTL languages (Arabic)", () => {
-  const arRes = tokenizeScript("النواة هي مركز التحكم في الخلية.", "ar");
-  assert.ok(arRes.tokens.length >= 5);
-  const arIdx = findTermWordIndex(arRes.tokens, "الخلية", "ar");
-  assert.ok(arIdx !== null && arIdx >= 0);
+test("tokenizeScript handles RTL Indian language (Urdu)", () => {
+  const urRes = tokenizeScript("خلیے کا کنٹرول سینٹر نیوکلیئس ہے۔", "ur");
+  assert.ok(urRes.tokens.length >= 5);
+  const urIdx = findTermWordIndex(urRes.tokens, "نیوکلیئس", "ur");
+  assert.ok(urIdx !== null && urIdx >= 0);
 });
