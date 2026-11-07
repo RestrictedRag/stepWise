@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import { focusBox, type BoardScript, type Color } from "../../../lib/board";
 import { boardScriptToManifest, type LessonManifest, type VectorCommand, type DrawCommand } from "../../../lib/manifest";
-import { StepWisePlaybackEngine, type EngineActiveState } from "../../../lib/engine/playbackEngine";
+import { GlobalPlaybackEngine, type GlobalEngineState } from "../../../lib/engine/playbackEngine";
 import { isStroke, renderShape } from "./shapes";
 import VirtualStylus from "./VirtualStylus";
 
@@ -18,11 +18,67 @@ const pill = {
   color: "var(--text)",
 } as const;
 
+interface AnimatedVectorProps {
+  cmd: any;
+  progress: number;
+  eraseProgress: number;
+}
+
+function AnimatedVector({ cmd, progress, eraseProgress }: AnimatedVectorProps) {
+  const gRef = useRef<SVGGElement>(null);
+  const [pathLen, setPathLen] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!gRef.current) return;
+    const els = gRef.current.querySelectorAll<SVGGeometryElement>("path, line, circle, rect, ellipse");
+    let maxLen = 0;
+    els.forEach((el) => {
+      if (typeof el.getTotalLength === "function") {
+        try {
+          const l = el.getTotalLength();
+          if (l > maxLen) maxLen = l;
+        } catch {}
+      }
+    });
+    if (maxLen > 0) setPathLen(maxLen);
+  }, [cmd.id]);
+
+  const shapeObj = cmd.shape as any;
+  const stroke = isStroke(shapeObj);
+  const clampedProgress = Math.max(0, Math.min(1, progress));
+  const opacity = Math.max(0, 1 - eraseProgress) * (stroke ? 1 : Math.min(1, clampedProgress * 1.5));
+
+  const strokeStyle: React.CSSProperties = stroke
+    ? pathLen !== null
+      ? {
+          strokeDasharray: pathLen,
+          strokeDashoffset: pathLen * (1 - clampedProgress),
+        }
+      : {
+          strokeDasharray: "1 1",
+          strokeDashoffset: Math.max(0, 1 - clampedProgress),
+        }
+    : {};
+
+  return (
+    <g
+      ref={gRef}
+      id={`vector-${cmd.id}`}
+      style={{
+        opacity,
+        ...strokeStyle,
+      }}
+    >
+      {renderShape(shapeObj)}
+    </g>
+  );
+}
+
 interface Props {
   script?: BoardScript;
   manifest?: LessonManifest;
   step: number;
-  engine?: StepWisePlaybackEngine | null;
+  engine?: GlobalPlaybackEngine | null;
   follow: boolean;
   onFollowChange: (f: boolean) => void;
   asks?: { at: number; text: string }[];
@@ -50,7 +106,7 @@ export default function LayeredBoardSurface({
     return null;
   }, [rawManifest, script]);
 
-  const [activeEngineState, setActiveEngineState] = useState<EngineActiveState | null>(null);
+  const [activeEngineState, setActiveEngineState] = useState<GlobalEngineState | null>(null);
 
   useEffect(() => {
     if (!engine) {
@@ -215,10 +271,10 @@ export default function LayeredBoardSurface({
                   {st.commands.map((cmd) => {
                     if (cmd.action !== "DRAW") return null;
 
-                    // If erased in active state, hide it
-                    if (!isPastStep && activeEngineState?.erasedElementIds.has(cmd.id)) {
-                      return null;
-                    }
+                    const eraseP =
+                      activeEngineState?.eraseProgress?.get(cmd.id) ??
+                      (activeEngineState?.erasedElementIds.has(cmd.id) ? 1.0 : 0.0);
+                    if (eraseP >= 1.0) return null;
 
                     const isCompleted = isPastStep || Boolean(activeEngineState?.completedCommandIds.has(cmd.id));
                     const isActive = !isPastStep && Boolean(activeEngineState?.activeCommandIds.has(cmd.id));
@@ -226,20 +282,17 @@ export default function LayeredBoardSurface({
                     // If neither completed nor active, command hasn't occurred yet
                     if (!isCompleted && !isActive) return null;
 
-                    const shapeObj = cmd.shape as any;
-                    const stroke = isStroke(shapeObj);
+                    const progress = isPastStep
+                      ? 1.0
+                      : activeEngineState?.commandProgress?.get(cmd.id) ?? (isCompleted ? 1.0 : 0.0);
 
                     return (
-                      <g
+                      <AnimatedVector
                         key={cmd.id}
-                        id={`vector-${cmd.id}`}
-                        style={{
-                          opacity: isCompleted ? 1 : isActive ? 1 : 0,
-                          transition: stroke ? "none" : "opacity 0.3s ease",
-                        }}
-                      >
-                        {renderShape(shapeObj)}
-                      </g>
+                        cmd={cmd}
+                        progress={progress}
+                        eraseProgress={eraseP}
+                      />
                     );
                   })}
                 </g>
@@ -318,6 +371,38 @@ export default function LayeredBoardSurface({
         >
           Follow tutor
         </button>
+      )}
+
+      {activeEngineState?.isStalled && (
+        <div
+          style={{
+            position: "absolute",
+            top: 16,
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "var(--bg)",
+            border: "1px solid var(--line)",
+            borderRadius: 999,
+            padding: "6px 16px",
+            fontSize: 13,
+            color: "var(--text)",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+            zIndex: 10,
+          }}
+        >
+          <span
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              background: "var(--ink-orange)",
+            }}
+          />
+          Tutor preparing next step...
+        </div>
       )}
     </div>
   );

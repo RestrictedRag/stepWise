@@ -1,192 +1,182 @@
-// StepWise Playback Engine: Master-clock driven animation timeline with bi-directional scrubbing.
-import type { VectorCommand, StepManifest } from "../manifest.ts";
+// Global StepWise Playback Engine with Master-Clock Drift Correction (|drift| > 80ms) and Reversible Bi-directional Scrubbing.
+import type { CompiledStepManifest, CompiledCommand, CompiledDrawCommand } from "../manifest.ts";
 
-export interface CommandRuntimeState {
-  command: VectorCommand;
-  status: "pending" | "active" | "completed";
-  progress: number; // 0.0 to 1.0
-}
-
-export interface EngineActiveState {
-  timeMs: number;
-  durationMs: number;
-  progress: number;
+export interface GlobalEngineState {
+  globalTimeMs: number;
+  totalDurationMs: number;
+  currentStepIndex: number;
+  stepTimeMs: number;
+  isPlaying: boolean;
+  isScrubbing: boolean;
+  isStalled: boolean;
   activeCommandIds: Set<string>;
   completedCommandIds: Set<string>;
+  commandProgress: Map<string, number>;
+  eraseProgress: Map<string, number>;
   highlightedElementIds: Map<string, { style: string; intensity: number }>;
   erasedElementIds: Set<string>;
-  stylusPosition: { x: number; y: number; active: boolean } | null;
-  cameraViewport: { x: number; y: number; width: number; height: number } | null;
+  stepOffsets: number[];
+  cameraViewport?: { x: number; y: number; width: number; height: number };
+  stylusPosition?: { x: number; y: number; active: boolean };
 }
 
-export type PlaybackListener = (state: EngineActiveState) => void;
+export type EngineActiveState = GlobalEngineState;
 
-export class StepWisePlaybackEngine {
-  private step: StepManifest;
-  private audio: HTMLAudioElement | null = null;
-  private currentTimeMs: number = 0;
-  private durationMs: number = 1000;
+export type GlobalPlaybackListener = (state: GlobalEngineState) => void;
+
+export class GlobalPlaybackEngine {
+  private steps: CompiledStepManifest[] = [];
+  private stepOffsets: number[] = [];
+  private totalDurationMs: number = 0;
+  private currentStepIndex: number = 0;
+  private globalTimeMs: number = 0;
   private isPlaying: boolean = false;
   private isScrubbing: boolean = false;
+  private isStalled: boolean = false;
   private speed: number = 1.0;
+
+  private audios: Map<number, HTMLAudioElement> = new Map();
   private rafId: number | null = null;
   private lastRafTimestamp: number | null = null;
-  private listeners: Set<PlaybackListener> = new Set();
-  private onStepCompleteCallback: (() => void) | null = null;
+  private listeners: Set<GlobalPlaybackListener> = new Set();
+  private onStepChangedCallback?: (stepIndex: number) => void;
 
-  constructor(step: StepManifest) {
-    this.step = step;
-    this.durationMs = Math.max(500, step.speech.durationMs);
-    this.seekMs(0);
+  constructor(initialSteps: CompiledStepManifest[] = []) {
+    initialSteps.forEach((s) => this.appendStep(s));
   }
 
-  public subscribe(listener: PlaybackListener): () => void {
+  public subscribe(listener: GlobalPlaybackListener): () => void {
     this.listeners.add(listener);
-    listener(this.computeStateAt(this.currentTimeMs));
+    listener(this.computeStateAt(this.globalTimeMs));
     return () => this.listeners.delete(listener);
   }
 
-  public onComplete(cb: () => void) {
-    this.onStepCompleteCallback = cb;
+  public onStepChange(cb: (stepIndex: number) => void) {
+    this.onStepChangedCallback = cb;
   }
 
-  public bindAudio(audio: HTMLAudioElement) {
-    this.audio = audio;
-    this.audio.playbackRate = this.speed;
-    this.durationMs = Math.max(this.durationMs, Math.round((audio.duration || 0) * 1000));
+  // Appends a new step dynamically as it arrives over the stream
+  public appendStep(step: CompiledStepManifest) {
+    const offset = this.totalDurationMs;
+    this.steps.push(step);
+    this.stepOffsets.push(offset);
+    this.totalDurationMs += step.speech.durationMs;
 
-    audio.onended = () => {
-      this.pause();
-      this.seekMs(this.durationMs);
-      this.onStepCompleteCallback?.();
-    };
+    // If stalled waiting for this step, resume playback
+    if (this.isStalled && this.isPlaying) {
+      this.isStalled = false;
+      this.play();
+    }
+
+    this.emit();
+  }
+
+  public bindStepAudio(stepIndex: number, audio: HTMLAudioElement) {
+    audio.playbackRate = this.speed;
+    this.audios.set(stepIndex, audio);
   }
 
   public play() {
-    if (this.isPlaying) return;
+    if (this.isPlaying && !this.isStalled) return;
     this.isPlaying = true;
 
-    if (this.audio) {
-      this.audio.currentTime = this.currentTimeMs / 1000;
-      this.audio.playbackRate = this.speed;
-      this.audio.play().catch(() => {
-        // Fallback to internal clock if audio play is blocked or unavailable
-      });
+    // Check if we reached end of all compiled steps
+    if (this.globalTimeMs >= this.totalDurationMs) {
+      this.isStalled = true;
+      this.emit();
+      return;
     }
 
+    this.syncActiveAudioPlayState(true);
     this.lastRafTimestamp = null;
     this.startLoop();
+    this.emit();
   }
 
   public pause() {
     this.isPlaying = false;
-    if (this.audio && !this.audio.paused) {
-      this.audio.pause();
-    }
+    this.syncActiveAudioPlayState(false);
     if (this.rafId !== null && typeof cancelAnimationFrame === "function") {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;
     }
+    this.emit();
   }
 
+  // Speed changes go through audio.playbackRate ONLY
   public setSpeed(multiplier: number) {
     this.speed = Math.max(0.25, Math.min(3.0, multiplier));
-    if (this.audio) {
-      this.audio.playbackRate = this.speed;
-    }
+    this.audios.forEach((audio) => {
+      audio.playbackRate = this.speed;
+    });
   }
 
+  // Bi-directional Scrubbing
   public startScrub() {
     this.isScrubbing = true;
     this.pause();
   }
 
-  public scrubToMs(targetMs: number) {
-    this.seekMs(targetMs);
+  public scrubToGlobalMs(targetMs: number) {
+    this.seekGlobalMs(targetMs);
   }
 
   public endScrub(resumePlayback: boolean) {
     this.isScrubbing = false;
-    if (resumePlayback && this.currentTimeMs < this.durationMs) {
+    if (resumePlayback && this.globalTimeMs < this.totalDurationMs) {
       this.play();
-    }
-  }
-
-  public seekMs(targetMs: number) {
-    this.currentTimeMs = Math.max(0, Math.min(this.durationMs, targetMs));
-    if (this.audio) {
-      this.audio.currentTime = this.currentTimeMs / 1000;
-    }
-    const state = this.computeStateAt(this.currentTimeMs);
-    this.emit(state);
-  }
-
-  public tickManual(deltaMs: number) {
-    if (!this.isPlaying) return;
-    const nextMs = this.currentTimeMs + deltaMs * this.speed;
-    if (nextMs >= this.durationMs) {
-      this.seekMs(this.durationMs);
-      this.pause();
-      this.onStepCompleteCallback?.();
     } else {
-      this.seekMs(nextMs);
+      this.emit();
     }
   }
 
-  public computeStateAt(timeMs: number): EngineActiveState {
-    const activeCommandIds = new Set<string>();
-    const completedCommandIds = new Set<string>();
-    const highlightedElementIds = new Map<string, { style: string; intensity: number }>();
-    const erasedElementIds = new Set<string>();
-    let cameraViewport: { x: number; y: number; width: number; height: number } | null = null;
-    let stylusPosition: { x: number; y: number; active: boolean } | null = null;
+  public seekGlobalMs(targetMs: number) {
+    const clamped = Math.max(0, Math.min(this.totalDurationMs, targetMs));
+    this.globalTimeMs = clamped;
 
-    for (const cmd of this.step.commands) {
-      const start = cmd.startMs;
-      const end = cmd.startMs + cmd.durationMs;
+    const newStepIndex = this.findStepIndexForTime(clamped);
+    const stepChanged = newStepIndex !== this.currentStepIndex;
 
-      if (timeMs >= end) {
-        completedCommandIds.add(cmd.id);
-        if (cmd.action === "ERASE") {
-          cmd.targetElementIds.forEach((id) => erasedElementIds.add(id));
-        }
-        if (cmd.action === "CAMERA_ZOOM") {
-          cameraViewport = cmd.targetViewport;
-        }
-      } else if (timeMs >= start) {
-        activeCommandIds.add(cmd.id);
-        const progress = (timeMs - start) / Math.max(1, cmd.durationMs);
+    if (stepChanged) {
+      // Pause previous audio
+      const prevAudio = this.audios.get(this.currentStepIndex);
+      if (prevAudio && !prevAudio.paused) prevAudio.pause();
 
-        if (cmd.action === "HIGHLIGHT") {
-          highlightedElementIds.set(cmd.targetElementId, {
-            style: cmd.style,
-            intensity: Math.sin(progress * Math.PI), // pulse arc
-          });
-        } else if (cmd.action === "ERASE") {
-          // Progressively erasing
-          cmd.targetElementIds.forEach((id) => erasedElementIds.add(id));
-        } else if (cmd.action === "DRAW" && cmd.style.showStylus) {
-          const pt = getShapeSamplePoint(cmd.shape, progress);
-          if (pt) {
-            stylusPosition = { x: pt[0], y: pt[1], active: true };
-          }
-        } else if (cmd.action === "CAMERA_ZOOM") {
-          cameraViewport = cmd.targetViewport;
-        }
-      }
+      this.currentStepIndex = newStepIndex;
+      this.onStepChangedCallback?.(newStepIndex);
     }
 
-    return {
-      timeMs,
-      durationMs: this.durationMs,
-      progress: this.durationMs > 0 ? timeMs / this.durationMs : 0,
-      activeCommandIds,
-      completedCommandIds,
-      highlightedElementIds,
-      erasedElementIds,
-      stylusPosition,
-      cameraViewport,
-    };
+    // Seek active audio
+    const activeAudio = this.audios.get(this.currentStepIndex);
+    if (activeAudio) {
+      const localSec = (clamped - this.stepOffsets[this.currentStepIndex]) / 1000;
+      activeAudio.currentTime = Math.max(0, localSec);
+    }
+
+    this.emit();
+  }
+
+  private findStepIndexForTime(timeMs: number): number {
+    for (let i = this.stepOffsets.length - 1; i >= 0; i--) {
+      if (timeMs >= this.stepOffsets[i]) return i;
+    }
+    return 0;
+  }
+
+  private syncActiveAudioPlayState(play: boolean) {
+    const activeAudio = this.audios.get(this.currentStepIndex);
+    if (!activeAudio) return;
+
+    if (play) {
+      const localSec = (this.globalTimeMs - this.stepOffsets[this.currentStepIndex]) / 1000;
+      if (Math.abs(activeAudio.currentTime - localSec) > 0.08) {
+        activeAudio.currentTime = localSec;
+      }
+      activeAudio.playbackRate = this.speed;
+      activeAudio.play().catch(() => {});
+    } else {
+      if (!activeAudio.paused) activeAudio.pause();
+    }
   }
 
   private startLoop() {
@@ -195,19 +185,55 @@ export class StepWisePlaybackEngine {
     const frame = (now: number) => {
       if (!this.isPlaying || this.isScrubbing) return;
 
-      if (this.audio && !this.audio.paused && !this.audio.seeking) {
-        // Tightly bind to audio.currentTime
-        const audioMs = Math.round(this.audio.currentTime * 1000);
-        this.seekMs(audioMs);
+      const activeAudio = this.audios.get(this.currentStepIndex);
+      const stepOffset = this.stepOffsets[this.currentStepIndex] ?? 0;
+
+      if (activeAudio && !activeAudio.paused && !activeAudio.seeking) {
+        // Audio is master clock. Timeline runs on internal progression,
+        // and gently corrects only when |drift| > 80ms.
+        const audioGlobalMs = stepOffset + Math.round(activeAudio.currentTime * 1000);
+        const drift = audioGlobalMs - this.globalTimeMs;
+
+        if (Math.abs(drift) > 80) {
+          // Correct clock gently
+          this.globalTimeMs = audioGlobalMs;
+        } else {
+          // Advance smoothly with delta
+          if (this.lastRafTimestamp !== null) {
+            const dt = (now - this.lastRafTimestamp) * this.speed;
+            this.globalTimeMs += dt;
+          }
+        }
+
+        // Check if current step audio ended
+        if (activeAudio.ended || activeAudio.currentTime >= activeAudio.duration) {
+          this.advanceToNextStep();
+        }
       } else {
+        // Fallback: silent reading clock
         if (this.lastRafTimestamp !== null) {
-          const delta = now - this.lastRafTimestamp;
-          this.tickManual(delta);
+          const dt = (now - this.lastRafTimestamp) * this.speed;
+          this.globalTimeMs += dt;
+
+          const currentStep = this.steps[this.currentStepIndex];
+          if (currentStep && this.globalTimeMs >= stepOffset + currentStep.speech.durationMs) {
+            this.advanceToNextStep();
+          }
         }
       }
+
       this.lastRafTimestamp = now;
 
-      if (this.isPlaying) {
+      if (this.globalTimeMs >= this.totalDurationMs) {
+        // Stalled or complete
+        this.globalTimeMs = this.totalDurationMs;
+        this.isStalled = true;
+        this.pause();
+      }
+
+      this.emit();
+
+      if (this.isPlaying && !this.isStalled) {
         this.rafId = requestAnimationFrame(frame);
       }
     };
@@ -215,43 +241,101 @@ export class StepWisePlaybackEngine {
     this.rafId = requestAnimationFrame(frame);
   }
 
-  private emit(state: EngineActiveState) {
+  private advanceToNextStep() {
+    const nextIdx = this.currentStepIndex + 1;
+    if (nextIdx < this.steps.length) {
+      this.seekGlobalMs(this.stepOffsets[nextIdx]);
+      if (this.isPlaying) {
+        this.syncActiveAudioPlayState(true);
+      }
+    } else {
+      // Stall waiting for streaming step
+      this.isStalled = true;
+      this.pause();
+    }
+  }
+
+  public computeStateAt(globalMs: number): GlobalEngineState {
+    const stepIdx = this.findStepIndexForTime(globalMs);
+    const stepOffset = this.stepOffsets[stepIdx] ?? 0;
+    const stepTimeMs = globalMs - stepOffset;
+
+    const activeCommandIds = new Set<string>();
+    const completedCommandIds = new Set<string>();
+    const commandProgress = new Map<string, number>();
+    const eraseProgress = new Map<string, number>();
+    const highlightedElementIds = new Map<string, { style: string; intensity: number }>();
+    const erasedElementIds = new Set<string>();
+
+    // Evaluate all commands up to the current global time deterministically
+    for (let s = 0; s <= stepIdx; s++) {
+      const step = this.steps[s];
+      const offset = this.stepOffsets[s];
+
+      for (const cmd of step.commands) {
+        const cmdGlobalStart = offset + cmd.startMs;
+        const cmdGlobalEnd = cmdGlobalStart + cmd.durationMs;
+
+        if (globalMs >= cmdGlobalEnd) {
+          completedCommandIds.add(cmd.id);
+          commandProgress.set(cmd.id, 1.0);
+          if (cmd.action === "ERASE") {
+            cmd.targetIds.forEach((tid) => {
+              erasedElementIds.add(tid);
+              eraseProgress.set(tid, 1.0);
+            });
+          }
+        } else if (globalMs >= cmdGlobalStart) {
+          activeCommandIds.add(cmd.id);
+          const progress = Math.max(0, Math.min(1, (globalMs - cmdGlobalStart) / Math.max(1, cmd.durationMs)));
+          commandProgress.set(cmd.id, progress);
+
+          if (cmd.action === "HIGHLIGHT") {
+            highlightedElementIds.set(cmd.targetId, {
+              style: cmd.style,
+              intensity: Math.sin(progress * Math.PI), // pulse arc
+            });
+          } else if (cmd.action === "ERASE") {
+            // Reversible fade-based erase: elements fade out
+            cmd.targetIds.forEach((tid) => {
+              eraseProgress.set(tid, progress);
+              if (progress >= 0.95) erasedElementIds.add(tid);
+            });
+          }
+        } else {
+          commandProgress.set(cmd.id, 0.0);
+        }
+      }
+    }
+
+    return {
+      globalTimeMs: globalMs,
+      totalDurationMs: this.totalDurationMs,
+      currentStepIndex: stepIdx,
+      stepTimeMs,
+      isPlaying: this.isPlaying,
+      isScrubbing: this.isScrubbing,
+      isStalled: this.isStalled,
+      activeCommandIds,
+      completedCommandIds,
+      commandProgress,
+      eraseProgress,
+      highlightedElementIds,
+      erasedElementIds,
+      stepOffsets: this.stepOffsets,
+    };
+  }
+
+  private emit() {
+    const state = this.computeStateAt(this.globalTimeMs);
     this.listeners.forEach((l) => l(state));
   }
 
   public destroy() {
     this.pause();
     this.listeners.clear();
-    this.audio = null;
+    this.audios.clear();
   }
 }
 
-function getShapeSamplePoint(shape: any, progress: number): [number, number] | null {
-  if (!shape) return null;
-  switch (shape.type) {
-    case "line":
-    case "arrow": {
-      const [x1, y1] = shape.from;
-      const [x2, y2] = shape.to;
-      return [x1 + (x2 - x1) * progress, y1 + (y2 - y1) * progress];
-    }
-    case "circle": {
-      const angle = progress * 2 * Math.PI;
-      return [shape.x + shape.r * Math.cos(angle), shape.y + shape.r * Math.sin(angle)];
-    }
-    case "rect": {
-      // Traverse perimeter
-      const p = progress * 4;
-      if (p <= 1) return [shape.x + shape.w * p, shape.y];
-      if (p <= 2) return [shape.x + shape.w, shape.y + shape.h * (p - 1)];
-      if (p <= 3) return [shape.x + shape.w * (3 - p), shape.y + shape.h];
-      return [shape.x, shape.y + shape.h * (4 - p)];
-    }
-    default:
-      if (typeof shape.x === "number" && typeof shape.y === "number") {
-        return [shape.x, shape.y];
-      }
-      return null;
-  }
-}
-
+export { GlobalPlaybackEngine as StepWisePlaybackEngine };
