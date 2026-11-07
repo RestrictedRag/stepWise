@@ -1,35 +1,12 @@
-import { parseSolveRequest, type Image } from "../../../lib/validate";
+import { parseSolveRequest } from "../../../lib/validate";
 import { takeDeltas } from "../../../lib/sse";
 import { llmChat } from "../../../lib/llm";
-
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
+import { geminiText } from "../../../lib/gemini";
 
 const SYSTEM =
   "You are StepWise, a patient tutor. Solve the student's problem step by step. " +
   "Number each step, explain why it works, and finish with a line starting 'Answer:'. " +
   "If the question is unclear, say what you can read and ask for clarification.";
-
-// The Groq model is text-only, so Gemini Flash turns the photo into text first.
-async function readPhoto(image: Image) {
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY ?? "" },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { inline_data: { mime_type: image.mediaType, data: image.data } },
-            { text: "Transcribe the homework problem in this image exactly, as plain text. Write math inline (e.g. x^2 + 3x = 10). Output only the transcription; if unreadable, say so." },
-          ],
-        }],
-      }),
-    },
-  );
-  if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
-  const json = await res.json();
-  return (json.candidates?.[0]?.content?.parts ?? []).map((p: { text?: string }) => p.text ?? "").join("").trim();
-}
 
 // shortcut: no auth or rate limit yet, add per-IP/device limits before public deploy.
 export async function POST(req: Request) {
@@ -45,7 +22,8 @@ export async function POST(req: Request) {
   let question = parsed.text ?? "";
   if (parsed.image) {
     try {
-      const transcript = await readPhoto(parsed.image);
+      // The Groq model is text-only, so Gemini Flash turns the photo into text first.
+      const transcript = await geminiText(parsed.image, "Transcribe the homework problem in this image exactly, as plain text. Write math inline (e.g. x^2 + 3x = 10). Output only the transcription; if unreadable, say so.");
       question = `Problem from the photo:\n${transcript}` + (parsed.text ? `\n\nStudent's note: ${parsed.text}` : "");
     } catch (err) {
       console.error(err);

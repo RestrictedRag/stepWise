@@ -46,6 +46,9 @@ The reels were watched frame by frame earlier. They were not downloaded, and the
 - Narration style is free text, chosen at ask time, with preset chips for quick picks. The style changes the tone, jokes and metaphors, never the facts.
 - A replay costs nothing: the lesson script and its audio are saved and replayed without new Groq or Gnani calls.
 - Past lessons for a PDF can be reopened from a "Saved ▾" list.
+- A lesson can be paused mid-step and resumed exactly where it stopped.
+- The student can ask a doubt mid-lesson. The answer plays in a drawer, and the lesson resumes where it was when the drawer closes.
+- The lesson position persists: after a reload, a saved lesson reopens at the step the student was on.
 
 ## Non-goals
 
@@ -55,6 +58,8 @@ The reels were watched frame by frame earlier. They were not downloaded, and the
 - Scanned-PDF search or text selection.
 - Multi-page answers. One question maps to one page.
 - The "watch me while I write" mode from reel 1.
+- Nested doubts. A doubt inside a doubt answer is one level only: it replaces the open doubt answer, it doesn't stack.
+- Scrubbing inside a step. Resume after a reload restarts the current step.
 
 ## Anti-goals (fails even if it works)
 
@@ -108,8 +113,26 @@ The reels were watched frame by frame earlier. They were not downloaded, and the
   - shortcut: character position, not real word timing; switch to per-phrase clips if the demo shows visible drift.
 - **Voice and language:** one Gnani voice, as today. The style is carried by word choice. The existing language choice (English, Hindi, Kannada, Tamil from `lib/validate.ts`) is kept on the ask bar.
 - **Build order:** the demo path first (upload, ask, styled narrated lesson with the reel look), then storage, the Saved list, the divider and phone layout.
-- **Audio generation:** clips are fetched in parallel right after the script arrives. Playback starts once step 1's clip is ready.
+- **Audio generation:** step 1's clip is fetched first, right after the script arrives. The other clips are fetched in the background once it settles. Playback starts once step 1's clip is ready.
 - **Saved lessons:** shown in a "Saved ▾" list on the PDF pane, newest first.
+
+## Interrupt, doubts and resume
+
+The user's vision: the board is a real-time 2D animation that the student can interrupt mid-lesson with a doubt, and the current state persists.
+
+- **Pause.** A Pause control freezes everything at once:
+  - CSS stroke animations stop with `animation-play-state: paused`.
+  - The step's audio pauses with `audio.pause()` and resumes with `play()`. The Audio element and its blob URL are held in a ref so pause doesn't tear them down.
+  - The step-advance timer keeps its remaining milliseconds and restarts with them.
+  - shortcut: a framer-motion move already running (dot, camera, under 1s) finishes on its own; set framer `duration: 0` while paused if that's visible.
+- **Doubt.** A "Doubt?" button pauses the lesson and opens a drawer with a second Player.
+  - The main Player stays mounted, paused and dimmed. Closing the drawer resumes it exactly where it stopped.
+  - The doubt answer is a short lesson of 2–3 steps, in the same style and language.
+  - The doubt request carries: the topic, the current step's `say`, the step titles so far, and the previous doubt's question if there was one. One level only (see Non-goals).
+- **Micro-steps.** Each lesson step is capped at about 15–20 seconds of narration, so a pause or doubt never loses much, and a reload restarts little.
+- **Persistence.** The saved lesson record stores the step index the student is on. On reopening, earlier steps render as already drawn (no animation) and the current step plays from its start.
+- **Deferred** (marked `shortcut:` in code): streaming the lesson script as it is generated; scrubbing inside a step.
+- **Rejected:** a new state library, Web Audio, other TTS vendors, speculative pre-generation of doubt answers, a stack of nested doubts, saving progress within a step.
 
 ## Left to the builder
 

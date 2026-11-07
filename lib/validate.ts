@@ -25,13 +25,24 @@ export function parseSolveRequest(body: any): SolveRequest {
 export const PERSONAS = ["teacher", "gossip", "coach", "story"] as const;
 export const LEVELS = ["primary", "middle", "high", "college"] as const;
 export const LANGS = ["en", "hi", "kn", "ta"] as const;
-const MAX_TOPIC = 300;
+export const MAX_TOPIC = 600;
+const MAX_STYLE = 80;
 
-export type LessonRequest = { topic: string; persona: (typeof PERSONAS)[number]; level: (typeof LEVELS)[number]; lang: (typeof LANGS)[number] };
+export type Doubt = { question: string; say: string; titles: string[]; prev?: string };
+export type LessonRequest = { topic: string; persona: (typeof PERSONAS)[number]; level: (typeof LEVELS)[number]; lang: (typeof LANGS)[number]; style: string; fromQuestion: boolean; doubt?: Doubt };
 const pick = <T extends string>(list: readonly T[], v: unknown, dflt: T): T | null =>
   v == null || v === "" ? dflt : (list as readonly unknown[]).includes(v) ? (v as T) : null;
 
-// Returns { topic, persona, level, lang } with defaults filled in, or { error }.
+const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+// Malformed doubt → undefined (the request is then an ordinary lesson).
+function parseDoubt(d: any): Doubt | undefined {
+  const question = str(d?.question, MAX_TOPIC);
+  if (!question) return undefined;
+  const titles = Array.isArray(d.titles) ? d.titles.slice(0, 8).map((t: unknown) => str(t, 80)).filter(Boolean) : [];
+  return { question, say: str(d.say, 600), titles, ...(str(d.prev, MAX_TOPIC) && { prev: str(d.prev, MAX_TOPIC) }) };
+}
+
+// Returns { topic, persona, level, lang, style, fromQuestion, doubt? } with defaults filled in, or { error }.
 export function parseLessonRequest(body: any): (LessonRequest & { error?: undefined }) | { error: string } {
   const topic = typeof body?.topic === "string" ? body.topic.trim() : "";
   if (!topic) return { error: "Type a topic to learn." };
@@ -40,5 +51,7 @@ export function parseLessonRequest(body: any): (LessonRequest & { error?: undefi
   const level = pick(LEVELS, body?.level, "middle");
   const lang = pick(LANGS, body?.lang, "en");
   if (!persona || !level || !lang) return { error: "Unknown persona, level or language." };
-  return { topic, persona, level, lang };
+  const style = typeof body?.style === "string" ? body.style.replace(/["\\]/g, "").replace(/\s+/g, " ").trim().slice(0, MAX_STYLE) : "";
+  const doubt = parseDoubt(body?.doubt);
+  return { topic, persona, level, lang, style, fromQuestion: body?.fromQuestion === true, ...(doubt && { doubt }) };
 }
