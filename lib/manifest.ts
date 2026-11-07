@@ -71,6 +71,23 @@ export const SemanticFormulaSchema = z.object({
   latex: z.string(),
 });
 
+export const SemanticFunctionPlotterSchema = z.object({
+  type: z.literal("function_plotter"),
+  f: z.string(),
+  xDomain: z.tuple([z.number(), z.number()]).default([-5, 5]),
+  yDomain: z.tuple([z.number(), z.number()]).default([-5, 5]),
+  zone: z.enum(["center", "left", "right"]).default("center"),
+});
+
+export const SemanticCoordinatePlaneSchema = z.object({
+  type: z.literal("coordinate_plane"),
+  xDomain: z.tuple([z.number(), z.number()]).default([-5, 5]),
+  yDomain: z.tuple([z.number(), z.number()]).default([-5, 5]),
+  grid: z.boolean().default(true),
+  points: z.array(z.tuple([z.number(), z.number()])).optional(),
+  zone: z.enum(["center", "left", "right"]).default("center"),
+});
+
 // Rare escape hatch for custom organic shapes (e.g. organelles)
 export const SemanticPathEscapeSchema = z.object({
   type: z.literal("path"),
@@ -85,6 +102,8 @@ export const SemanticObjectSchema = z.discriminatedUnion("type", [
   SemanticNumberLineSchema,
   SemanticTriangleSchema,
   SemanticFormulaSchema,
+  SemanticFunctionPlotterSchema,
+  SemanticCoordinatePlaneSchema,
   SemanticPathEscapeSchema,
 ]);
 export type SemanticObject = z.infer<typeof SemanticObjectSchema>;

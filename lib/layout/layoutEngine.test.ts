@@ -65,3 +65,35 @@ test("layoutEngine generates correct geometry for number lines and triangles", (
   const tri = layoutEngine.resolveObject("tri1", { type: "triangle", kind: "right" }, "green", ctx);
   assert.equal(tri.type, "path");
 });
+
+test("layoutEngine plots mathematical functions and coordinate planes", () => {
+  const ctx = createMockContext("en");
+
+  // Parabola: f(x) = x^2 - 4
+  const plot = layoutEngine.resolveObject(
+    "plot1",
+    { type: "function_plotter", f: "x^2 - 4", xDomain: [-3, 3], yDomain: [-5, 5], zone: "center" },
+    "purple",
+    ctx
+  );
+  assert.equal(plot.type, "path");
+  if (plot.type === "path") {
+    assert.ok(plot.d.startsWith("M"));
+    assert.ok(plot.d.includes("L"));
+    assert.equal(plot.color, "purple");
+  }
+
+  // Coordinate plane with points
+  const plane = layoutEngine.resolveObject(
+    "plane1",
+    { type: "coordinate_plane", xDomain: [-5, 5], yDomain: [-5, 5], grid: true, points: [[0, 0], [3, 4]], zone: "center" },
+    "ink",
+    ctx
+  );
+  assert.equal(plane.type, "path");
+  if (plane.type === "path") {
+    assert.ok(plane.d.includes("M"));
+    assert.ok(plane.d.includes("L"));
+    assert.equal(plane.color, "ink");
+  }
+});

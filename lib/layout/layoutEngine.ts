@@ -166,6 +166,104 @@ export class LayoutEngine {
         return shape;
       }
 
+      case "function_plotter": {
+        const [xMin, xMax] = semanticObj.xDomain;
+        const [yMin, yMax] = semanticObj.yDomain;
+        const xSpan = Math.max(0.1, xMax - xMin);
+        const ySpan = Math.max(0.1, yMax - yMin);
+
+        const boxX = 260;
+        const boxY = 160;
+        const boxW = 480;
+        const boxH = 400;
+
+        const numPoints = 80;
+        let d = "";
+        let first = true;
+
+        for (let i = 0; i <= numPoints; i++) {
+          const xi = xMin + (i / numPoints) * xSpan;
+          const yi = evaluateMath(semanticObj.f, xi);
+
+          if (!Number.isFinite(yi) || yi < yMin - 10 || yi > yMax + 10) {
+            first = true;
+            continue;
+          }
+
+          const px = Math.round(boxX + ((xi - xMin) / xSpan) * boxW);
+          const py = Math.round(boxY + boxH - ((yi - yMin) / ySpan) * boxH);
+
+          if (first) {
+            d += `M ${px} ${py} `;
+            first = false;
+          } else {
+            d += `L ${px} ${py} `;
+          }
+        }
+
+        const aabb: AABB = { id, x1: boxX, y1: boxY, x2: boxX + boxW, y2: boxY + boxH };
+        ctx.occupiedBoxes.push(aabb);
+
+        const shape: Shape = { type: "path", d: d.trim(), color };
+        ctx.drawnElements.set(id, { shape, aabb });
+        return shape;
+      }
+
+      case "coordinate_plane": {
+        const [xMin, xMax] = semanticObj.xDomain;
+        const [yMin, yMax] = semanticObj.yDomain;
+        const xSpan = Math.max(0.1, xMax - xMin);
+        const ySpan = Math.max(0.1, yMax - yMin);
+
+        const boxX = 260;
+        const boxY = 160;
+        const boxW = 480;
+        const boxH = 400;
+
+        const origX = Math.round(boxX + ((0 - xMin) / xSpan) * boxW);
+        const origY = Math.round(boxY + boxH - ((0 - yMin) / ySpan) * boxH);
+
+        let d = "";
+
+        // X-axis with arrow
+        d += `M ${boxX} ${origY} L ${boxX + boxW} ${origY} `;
+        d += `M ${boxX + boxW - 10} ${origY - 6} L ${boxX + boxW} ${origY} L ${boxX + boxW - 10} ${origY + 6} `;
+
+        // Y-axis with arrow
+        d += `M ${origX} ${boxY + boxH} L ${origX} ${boxY} `;
+        d += `M ${origX - 6} ${boxY + 10} L ${origX} ${boxY} L ${origX + 6} ${boxY + 10} `;
+
+        // Ticks along X
+        for (let x = Math.ceil(xMin); x <= Math.floor(xMax); x++) {
+          if (x === 0) continue;
+          const tx = Math.round(boxX + ((x - xMin) / xSpan) * boxW);
+          d += `M ${tx} ${origY - 4} L ${tx} ${origY + 4} `;
+        }
+
+        // Ticks along Y
+        for (let y = Math.ceil(yMin); y <= Math.floor(yMax); y++) {
+          if (y === 0) continue;
+          const ty = Math.round(boxY + boxH - ((y - yMin) / ySpan) * boxH);
+          d += `M ${origX - 4} ${ty} L ${origX + 4} ${ty} `;
+        }
+
+        // Plotted points if specified
+        if (semanticObj.points) {
+          for (const [px, py] of semanticObj.points) {
+            const cx = Math.round(boxX + ((px - xMin) / xSpan) * boxW);
+            const cy = Math.round(boxY + boxH - ((py - yMin) / ySpan) * boxH);
+            d += `M ${cx - 5} ${cy} L ${cx + 5} ${cy} M ${cx} ${cy - 5} L ${cx} ${cy + 5} `;
+          }
+        }
+
+        const aabb: AABB = { id, x1: boxX, y1: boxY, x2: boxX + boxW, y2: boxY + boxH };
+        ctx.occupiedBoxes.push(aabb);
+
+        const shape: Shape = { type: "path", d: d.trim(), color };
+        ctx.drawnElements.set(id, { shape, aabb });
+        return shape;
+      }
+
       case "label": {
         const text = ctx.labels[semanticObj.labelKey] || semanticObj.labelKey;
         const note = semanticObj.noteKey ? ctx.labels[semanticObj.noteKey] || semanticObj.noteKey : null;
@@ -230,6 +328,113 @@ export class LayoutEngine {
       }
     }
     return currentY;
+  }
+}
+
+// Safe math expression evaluator for function plotting (without eval)
+export function evaluateMath(expr: string, x: number): number {
+  const clean = expr.replace(/\s+/g, "").toLowerCase();
+
+  const tokens: string[] = [];
+  let i = 0;
+  while (i < clean.length) {
+    const ch = clean[i];
+    if (/[0-9.]/.test(ch)) {
+      let num = "";
+      while (i < clean.length && /[0-9.]/.test(clean[i])) {
+        num += clean[i++];
+      }
+      tokens.push(num);
+    } else if (/[a-z]/.test(ch)) {
+      let id = "";
+      while (i < clean.length && /[a-z]/.test(clean[i])) {
+        id += clean[i++];
+      }
+      tokens.push(id);
+    } else if ("+-*/^()".includes(ch)) {
+      tokens.push(ch);
+      i++;
+    } else {
+      i++;
+    }
+  }
+
+  let pos = 0;
+
+  function parseExpression(): number {
+    let val = parseTerm();
+    while (pos < tokens.length && (tokens[pos] === "+" || tokens[pos] === "-")) {
+      const op = tokens[pos++];
+      const rhs = parseTerm();
+      val = op === "+" ? val + rhs : val - rhs;
+    }
+    return val;
+  }
+
+  function parseTerm(): number {
+    let val = parsePower();
+    while (pos < tokens.length && (tokens[pos] === "*" || tokens[pos] === "/")) {
+      const op = tokens[pos++];
+      const rhs = parsePower();
+      val = op === "*" ? val * rhs : val / (rhs === 0 ? 1e-9 : rhs);
+    }
+    return val;
+  }
+
+  function parsePower(): number {
+    let val = parseFactor();
+    if (pos < tokens.length && tokens[pos] === "^") {
+      pos++;
+      const rhs = parsePower();
+      val = Math.pow(val, rhs);
+    }
+    return val;
+  }
+
+  function parseFactor(): number {
+    if (pos >= tokens.length) return 0;
+    const tok = tokens[pos++];
+
+    if (tok === "-") return -parseFactor();
+    if (tok === "+") return parseFactor();
+    if (tok === "(") {
+      const val = parseExpression();
+      if (pos < tokens.length && tokens[pos] === ")") pos++;
+      return val;
+    }
+    if (tok === "x") return x;
+    if (tok === "pi") return Math.PI;
+    if (tok === "e") return Math.E;
+    if (["sin", "cos", "tan", "sqrt", "abs", "log", "ln", "exp"].includes(tok)) {
+      let arg = 0;
+      if (pos < tokens.length && tokens[pos] === "(") {
+        pos++;
+        arg = parseExpression();
+        if (pos < tokens.length && tokens[pos] === ")") pos++;
+      } else {
+        arg = parseFactor();
+      }
+      switch (tok) {
+        case "sin": return Math.sin(arg);
+        case "cos": return Math.cos(arg);
+        case "tan": return Math.tan(arg);
+        case "sqrt": return Math.sqrt(Math.max(0, arg));
+        case "abs": return Math.abs(arg);
+        case "exp": return Math.exp(arg);
+        case "log":
+        case "ln": return Math.log(Math.max(1e-9, arg));
+      }
+    }
+
+    const n = parseFloat(tok);
+    return isNaN(n) ? 0 : n;
+  }
+
+  try {
+    const res = parseExpression();
+    return Number.isFinite(res) ? res : 0;
+  } catch {
+    return 0;
   }
 }
 
