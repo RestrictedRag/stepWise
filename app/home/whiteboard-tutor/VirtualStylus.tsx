@@ -45,3 +45,4 @@ export default function VirtualStylus({ x, y, active, color = "ink" }: Props) {
     </g>
   );
 }
+
