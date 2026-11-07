@@ -25,3 +25,6 @@ export function parseAnswer(text: string): Parsed {
     error,
   };
 }
+
+// stream ended with no Answer line and no error marker: the model stopped early
+export const incomplete = (p: Parsed) => p.answer === null && !p.error;

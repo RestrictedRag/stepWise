@@ -13,6 +13,7 @@ export default function InputCard({ text, setText }: { text: string; setText: (f
   const initial = useSearchParams()?.get("mode");
   const [mode, setMode] = useState<Mode>(MODES.some((m) => m.id === initial) ? (initial as Mode) : "solver");
   const [image, setImage] = useState<Img | null>(null);
+  const [saveError, setSaveError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const { mic, micError, toggleMic } = useMic((t) => setText((p) => (p ? p + " " + t : t)));
   const ok = canSubmit(text, !!image);
@@ -20,7 +21,7 @@ export default function InputCard({ text, setText }: { text: string; setText: (f
   function submit() {
     if (!ok) return;
     const e = newEntry(mode, text.trim(), image ?? undefined);
-    saveEntry(e);
+    if (!saveEntry(e)) { setSaveError("Couldn't save — storage is full or blocked."); return; }
     router.push(hrefFor(e));
   }
 
@@ -63,7 +64,7 @@ export default function InputCard({ text, setText }: { text: string; setText: (f
           <button aria-label="Attach image" onClick={() => fileRef.current?.click()} style={btn}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" /></svg>
           </button>
-          <span style={{ flex: 1, fontSize: 12, color: "var(--muted)" }}>{micError || (text.length > 600 ? `${text.length}/600` : "")}</span>
+          <span style={{ flex: 1, fontSize: 12, color: "var(--muted)" }}>{saveError || micError || (text.length > 600 ? `${text.length}/600` : "")}</span>
           <button aria-label={mic === "rec" ? "Stop recording" : "Record"} onClick={toggleMic} disabled={mic === "busy"} style={{ ...btn, color: mic === "rec" ? "#d33" : "var(--muted)" }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10a7 7 0 0014 0M12 17v5" /></svg>
           </button>

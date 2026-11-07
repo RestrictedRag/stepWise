@@ -34,3 +34,10 @@ test("bold markdown steps and answer", () => {
   assert.equal(r.steps[0].body, "f(x)=x^2");
   assert.equal(r.answer, "2x");
 });
+
+test("I3: stream that ends without Answer is incomplete", async () => {
+  const { incomplete } = await import("./answer.ts");
+  assert.equal(incomplete(parseAnswer("Step 1: x\nwork")), true);
+  assert.equal(incomplete(parseAnswer("Step 1: x\nAnswer: 4")), false);
+  assert.equal(incomplete(parseAnswer("[Error: could not finish solving]")), false);
+});

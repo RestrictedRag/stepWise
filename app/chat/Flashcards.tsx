@@ -67,12 +67,12 @@ export default function Flashcards({ topic }: { topic: string }) {
   return (
     <div style={{ margin: "16px 0" }}>
       <p style={{ color: "var(--muted)", textAlign: "center" }}>{i + 1} / {cards.length}</p>
-      <div style={{ perspective: 1000, height: 240, cursor: "pointer" }} onClick={() => setFlip((f) => !f)} role="button" aria-label={flip ? "Show question" : "Show answer"}>
+      <button type="button" style={{ display: "block", width: "100%", border: "none", background: "none", padding: 0, font: "inherit", color: "inherit", perspective: 1000, height: 240, cursor: "pointer" }} onClick={() => setFlip((f) => !f)} aria-label={flip ? "Show question" : "Show answer"}>
         <div style={{ position: "relative", height: "100%", transition: "transform 0.5s", transformStyle: "preserve-3d", transform: flip ? "rotateY(180deg)" : "none" }}>
           <div style={face}>{c.q}</div>
           <div style={{ ...face, transform: "rotateY(180deg)", background: "#eaf2ff", color: "#0b2a5b" }}>{c.a}</div>
         </div>
-      </div>
+      </button>
       <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 12 }}>
         <button style={btn} onClick={() => mark("review")}>Need to review</button>
         <button style={btn} onClick={() => mark("mastered")}>Mastered</button>

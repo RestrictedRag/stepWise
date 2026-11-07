@@ -7,7 +7,7 @@ import TopBar from "../shell/TopBar";
 import { getEntry, newEntry, saveEntry, type Entry, type Mode } from "../../lib/history";
 import { hrefFor } from "../../lib/modes";
 import { mathText } from "../../lib/mathtext";
-import { parseAnswer, type Parsed } from "../../lib/answer";
+import { incomplete, parseAnswer, type Parsed } from "../../lib/answer";
 import Flashcards from "./Flashcards";
 
 const STATUS = ["Reading your question…", "Solving step by step…"];
@@ -45,7 +45,9 @@ export default function Chat({ id }: { id: string }) {
         acc += dec.decode(value, { stream: true });
         setParsed(parseAnswer(acc));
       }
-      setParsed(parseAnswer(acc));
+      const p = parseAnswer(acc);
+      setParsed(p);
+      if (incomplete(p)) setFail("No answer came back.");
     } catch {
       if (me === run.current) setFail("Network error.");
     }
@@ -67,7 +69,7 @@ export default function Chat({ id }: { id: string }) {
 
   function go(mode: Mode, prompt: string) {
     const e = newEntry(mode, prompt);
-    saveEntry(e);
+    if (!saveEntry(e)) { setFail("Couldn't save — storage is full or blocked."); return; }
     router.push(hrefFor(e));
   }
 
