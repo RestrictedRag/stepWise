@@ -24,31 +24,63 @@ export function validateLessonManifest(data: unknown): { manifest: LessonManifes
 export const ColorSchema = z.enum(["ink", "purple", "orange", "green", "red", "blue"]);
 export type Color = z.infer<typeof ColorSchema>;
 
-// Semantic Objects supported in the first slice (NO raw coordinates from LLM)
+// Blueprints supported across scenes
+export const MacroBlueprintSchema = z.enum([
+  "process_flow",
+  "anatomy_structure",
+  "mathematical_derivation",
+  "comparison",
+  "cycle",
+  "freeform",
+]);
+export type MacroBlueprint = z.infer<typeof MacroBlueprintSchema>;
+
+// Cardinal Docking Ports (8 perimeter directions)
+export const CardinalPortSchema = z.enum(["N", "S", "E", "W", "NE", "NW", "SE", "SW"]);
+export type CardinalPort = z.infer<typeof CardinalPortSchema>;
+
+export const DockingEndpointSchema = z.object({
+  elementId: z.string(),
+  port: CardinalPortSchema.optional(),
+});
+export type DockingEndpoint = z.infer<typeof DockingEndpointSchema>;
+
+export const DockingEndpointInputSchema = z.union([
+  DockingEndpointSchema,
+  z.string().transform((elementId) => ({ elementId })),
+]);
+
+// Semantic Objects supported in the vertical slice (NO raw coordinates from LLM)
 export const SemanticLabelSchema = z.object({
   type: z.literal("label"),
   labelKey: z.string(),
   noteKey: z.string().optional(),
   attachToId: z.string().optional(),
+  slotId: z.string().optional(),
   position: z.enum(["center", "top", "bottom", "left", "right", "margin_left", "margin_right"]).optional(),
 });
 
 export const SemanticLineSchema = z.object({
   type: z.enum(["line", "arrow"]),
+  from: DockingEndpointInputSchema.optional(),
+  to: DockingEndpointInputSchema.optional(),
   fromId: z.string().optional(),
   toId: z.string().optional(),
+  slotId: z.string().optional(),
   direction: z.enum(["left_to_right", "right_to_left", "top_to_bottom", "bottom_to_top", "point_to_part"]).optional(),
 });
 
 export const SemanticCircleSchema = z.object({
   type: z.literal("circle"),
   size: z.enum(["sm", "md", "lg"]).default("md"),
+  slotId: z.string().optional(),
   zone: z.enum(["center", "left", "right"]).default("center"),
 });
 
 export const SemanticRectSchema = z.object({
   type: z.literal("rect"),
   size: z.enum(["sm", "md", "lg"]).default("md"),
+  slotId: z.string().optional(),
   zone: z.enum(["center", "left", "right"]).default("center"),
 });
 
@@ -57,18 +89,21 @@ export const SemanticNumberLineSchema = z.object({
   min: z.number(),
   max: z.number(),
   step: z.number().default(1),
+  slotId: z.string().optional(),
   highlightValues: z.array(z.number()).optional(),
 });
 
 export const SemanticTriangleSchema = z.object({
   type: z.literal("triangle"),
   kind: z.enum(["right", "equilateral", "isosceles", "generic"]).default("generic"),
+  slotId: z.string().optional(),
   sideLabelKeys: z.array(z.string()).optional(),
 });
 
 export const SemanticFormulaSchema = z.object({
   type: z.literal("formula"),
   latex: z.string(),
+  slotId: z.string().optional(),
 });
 
 export const SemanticFunctionPlotterSchema = z.object({
@@ -76,6 +111,7 @@ export const SemanticFunctionPlotterSchema = z.object({
   f: z.string(),
   xDomain: z.tuple([z.number(), z.number()]).default([-5, 5]),
   yDomain: z.tuple([z.number(), z.number()]).default([-5, 5]),
+  slotId: z.string().optional(),
   zone: z.enum(["center", "left", "right"]).default("center"),
 });
 
@@ -84,6 +120,7 @@ export const SemanticCoordinatePlaneSchema = z.object({
   xDomain: z.tuple([z.number(), z.number()]).default([-5, 5]),
   yDomain: z.tuple([z.number(), z.number()]).default([-5, 5]),
   grid: z.boolean().default(true),
+  slotId: z.string().optional(),
   points: z.array(z.tuple([z.number(), z.number()])).optional(),
   zone: z.enum(["center", "left", "right"]).default("center"),
 });
@@ -92,6 +129,7 @@ export const SemanticCoordinatePlaneSchema = z.object({
 export const SemanticPathEscapeSchema = z.object({
   type: z.literal("path"),
   d: z.string().regex(/^[MLHVCSQTAZmlhvcsqtaz0-9 ,.\-]{1,2000}$/),
+  slotId: z.string().optional(),
 });
 
 export const SemanticObjectSchema = z.discriminatedUnion("type", [
@@ -140,15 +178,28 @@ export const ChoreographerEraseCommandSchema = z.object({
   technique: z.enum(["fade", "reverse_dash"]).default("fade"),
 });
 
+// Scene transition command: fade out non-preserved elements and optionally switch blueprint
+export const ChoreographerTransitionCommandSchema = z.object({
+  id: z.string(),
+  action: z.literal("TRANSITION"),
+  technique: z.literal("fade").default("fade"),
+  anchor: AnchorSchema,
+  preserve: z.array(z.string()).default([]),
+  nextBlueprint: MacroBlueprintSchema.optional(),
+});
+export type ChoreographerTransitionCommand = z.infer<typeof ChoreographerTransitionCommandSchema>;
+
 export const ChoreographerCommandSchema = z.discriminatedUnion("action", [
   ChoreographerDrawCommandSchema,
   ChoreographerHighlightCommandSchema,
   ChoreographerEraseCommandSchema,
+  ChoreographerTransitionCommandSchema,
 ]);
 export type ChoreographerCommand = z.infer<typeof ChoreographerCommandSchema>;
 
 export const StepChoreographySchema = z.object({
   stepIndex: z.number().int().min(0),
+  sceneBlueprint: MacroBlueprintSchema.optional(),
   labels: z.record(z.string(), z.string()), // Localized text map: labelKey -> localized string
   commands: z.array(ChoreographerCommandSchema),
 });
@@ -160,6 +211,9 @@ export interface CompiledDrawCommand {
   action: "DRAW";
   startMs: number;
   durationMs: number;
+  enterMs?: number;
+  exitMs?: number;
+  slotId?: string;
   shape: Shape;
   color: Color;
 }
@@ -169,6 +223,8 @@ export interface CompiledHighlightCommand {
   action: "HIGHLIGHT";
   startMs: number;
   durationMs: number;
+  enterMs?: number;
+  exitMs?: number;
   targetId: string;
   style: "pulse" | "marker";
 }
@@ -178,11 +234,29 @@ export interface CompiledEraseCommand {
   action: "ERASE";
   startMs: number;
   durationMs: number;
+  enterMs?: number;
+  exitMs?: number;
   targetIds: string[];
   technique: "fade" | "reverse_dash";
 }
 
-export type CompiledCommand = CompiledDrawCommand | CompiledHighlightCommand | CompiledEraseCommand;
+export interface CompiledTransitionCommand {
+  id: string;
+  action: "TRANSITION";
+  startMs: number;
+  durationMs: number;
+  enterMs?: number;
+  exitMs?: number;
+  technique: "fade";
+  preserve: string[];
+  nextBlueprint?: MacroBlueprint;
+}
+
+export type CompiledCommand =
+  | CompiledDrawCommand
+  | CompiledHighlightCommand
+  | CompiledEraseCommand
+  | CompiledTransitionCommand;
 
 export interface CompiledStepManifest {
   stepIndex: number;
@@ -205,11 +279,13 @@ export interface CompiledStepManifest {
 }
 
 export interface LessonManifest {
-  version: "1.0.0";
+  version: "1.0.0" | "2.0.0";
+  manifestVersion?: 1 | 2;
   lessonId: string;
   language: string;
   title: string;
   subtitle?: string | null;
+  blueprint?: MacroBlueprint;
   steps: CompiledStepManifest[];
   metadata: {
     generatedAt: string;
