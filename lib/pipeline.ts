@@ -1,5 +1,5 @@
 // StepWise Multi-Stage Pipeline: Parallel TTS + Alignment, Sequential Choreographer, and Streaming Manifest
-import { pedagogyPrompt, choreographerPrompt } from "./prompts.ts";
+import { pedagogyPrompt, choreographerPrompt, allStepsChoreographerPrompt } from "./prompts.ts";
 import { normalizer } from "./normalizer.ts";
 import { tokenizeScript } from "./tokenizer.ts";
 import { getTtsProvider } from "./tts/registry.ts";
@@ -15,6 +15,7 @@ import type {
   CompiledStepManifest,
   CompiledCommand,
   StepChoreography,
+  ChoreographerTransitionCommand,
 } from "./manifest.ts";
 
 export interface PedagogyStep {
@@ -35,7 +36,7 @@ export interface PedagogyOutput {
 
 export async function* streamLessonManifest(
   req: LessonRequest,
-  ask: (msgs: Msg[]) => Promise<string>
+  ask: (msgs: Msg[], maxTokens?: number) => Promise<string>
 ): AsyncGenerator<CompiledStepManifest, LessonManifest, void> {
   const lang = req.lang || "en";
 
@@ -61,26 +62,82 @@ export async function* streamLessonManifest(
 
   const tts = getTtsProvider(lang);
 
-  // Step 2: Parallel TTS + Alignment for all steps
-  const audioPromises = pedData.steps.map(async (st, i) => {
+  // Step 2: Sequential TTS + Alignment for all steps (avoids Gnani 429 concurrency rate limits)
+  const preparedAudio: Array<{
+    stepIndex: number;
+    rawSay: string;
+    tokens: any[];
+    durationMs: number;
+    alignRes: any;
+    audioBytes: Uint8Array;
+  }> = [];
+
+  for (let i = 0; i < pedData.steps.length; i++) {
+    const st = pedData.steps[i];
     const norm = normalizer.normalize(st.say, lang);
     const { tokens } = tokenizeScript(norm.normalizedText, lang);
-    const synthRes = await tts.synthesize(norm.normalizedText, lang);
-    const alignRes = await alignerClient.align(tokens, synthRes.audio, synthRes.durationMs, lang);
 
-    return {
+    let synthRes;
+    try {
+      synthRes = await tts.synthesize(norm.normalizedText, lang);
+    } catch (ttsErr) {
+      console.warn(`[Pipeline] TTS synthesis failed for step ${i}, falling back to syllable estimate:`, ttsErr);
+      const estDurationMs = Math.max(3000, tokens.length * 400);
+      synthRes = {
+        audio: new Uint8Array([0, 1, 2, 3]),
+        durationMs: estDurationMs,
+      };
+    }
+
+    const alignRes = await alignerClient.align(tokens, synthRes.audio, synthRes.durationMs, lang);
+    preparedAudio.push({
       stepIndex: i,
       rawSay: st.say,
       tokens,
       durationMs: synthRes.durationMs,
       alignRes,
       audioBytes: synthRes.audio,
-    };
-  });
+    });
+  }
 
-  const preparedAudio = await Promise.all(audioPromises);
+  // Step 3: Choreography Generation
+  const macroBp = pedData.steps[0]?.visualIntent?.macroBlueprint || "process_flow";
+  const allChoreoMap = new Map<number, StepChoreography>();
 
-  // Step 3: Sequential Choreography & Compilation
+  try {
+    const allPrompt = allStepsChoreographerPrompt(
+      pedData.title,
+      macroBp,
+      pedData.steps.map((st, i) => ({
+        stepIndex: i,
+        say: preparedAudio[i].rawSay,
+        tokens: preparedAudio[i].tokens,
+        visualIntent: st.visualIntent,
+      })),
+      lang
+    );
+
+    const allReply = await ask(
+      [
+        { role: "system", content: "You are a master whiteboard visual choreographer. Output valid raw JSON immediately with no preamble or explanation." },
+        { role: "user", content: allPrompt },
+      ],
+      1200
+    );
+
+    const parsedAll = extractJson(allReply) as any;
+    if (Array.isArray(parsedAll?.steps)) {
+      for (const s of parsedAll.steps) {
+        const val = manifestValidator.validateChoreography(s);
+        if (val.parsed) {
+          allChoreoMap.set(val.parsed.stepIndex, val.parsed);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[Pipeline] Batched choreographer failed, falling back to per-step:", err);
+  }
+
   const layoutCtx: LayoutContext = {
     language: lang,
     labels: {},
@@ -91,42 +148,54 @@ export async function* streamLessonManifest(
   const compiledSteps: CompiledStepManifest[] = [];
   const drawnElementIds = new Set<string>();
 
+  const stepOffsets: number[] = [];
+  let curStepOffset = 0;
+  for (let s = 0; s < pedData.steps.length; s++) {
+    stepOffsets.push(curStepOffset);
+    curStepOffset += preparedAudio[s].durationMs;
+  }
+
   for (let i = 0; i < pedData.steps.length; i++) {
     const prep = preparedAudio[i];
     const pedStep = pedData.steps[i];
 
-    // Call Choreographer
-    const choreoP = choreographerPrompt(
-      i,
-      prep.rawSay,
-      prep.tokens,
-      pedStep.visualIntent,
-      Array.from(drawnElementIds),
-      lang
-    );
-
-    let choreoReply = await ask([
-      { role: "system", content: "You are a whiteboard visual choreographer. Reply strictly in JSON." },
-      { role: "user", content: choreoP },
-    ]);
-
-    let choreoData: StepChoreography | null = null;
-    try {
-      const parsedRaw = extractJson(choreoReply);
-      const val = manifestValidator.validateChoreography(parsedRaw);
-      if (val.parsed) choreoData = val.parsed;
-    } catch {}
+    // Check if batched choreography provided this step, otherwise use per-step call
+    let choreoData: StepChoreography | null = allChoreoMap.get(i) || null;
+    let choreoP = "";
+    let choreoReply = "";
 
     if (!choreoData) {
-      // 1-shot repair
+      choreoP = choreographerPrompt(
+        i,
+        prep.rawSay,
+        prep.tokens,
+        pedStep.visualIntent,
+        Array.from(drawnElementIds),
+        lang
+      );
+
       choreoReply = await ask([
+        { role: "system", content: "You are a whiteboard visual choreographer. Reply strictly in JSON." },
         { role: "user", content: choreoP },
-        { role: "assistant", content: choreoReply },
-        { role: "user", content: "Your reply did not match the Choreography schema. Reply with corrected JSON only." },
       ]);
-      const parsedRaw = extractJson(choreoReply);
-      const val = manifestValidator.validateChoreography(parsedRaw);
-      choreoData = val.parsed || { stepIndex: i, labels: {}, commands: [] };
+
+      try {
+        const parsedRaw = extractJson(choreoReply);
+        const val = manifestValidator.validateChoreography(parsedRaw);
+        if (val.parsed) choreoData = val.parsed;
+      } catch {}
+
+      if (!choreoData) {
+        // 1-shot repair
+        choreoReply = await ask([
+          { role: "user", content: choreoP },
+          { role: "assistant", content: choreoReply },
+          { role: "user", content: "Your reply did not match the Choreography schema. Reply with corrected JSON only." },
+        ]);
+        const parsedRaw = extractJson(choreoReply);
+        const val = manifestValidator.validateChoreography(parsedRaw);
+        choreoData = val.parsed || { stepIndex: i, labels: {}, commands: [] };
+      }
     }
 
     // 3-Stage Repair: Stage 1 (Deterministic fuzzy match)
@@ -153,8 +222,23 @@ export async function* streamLessonManifest(
       } catch {}
     }
 
+    // If scene blueprint changes and no transition was emitted, synthesize a clean scene transition
+    const stepHasTransition = choreoData.commands.some((c) => c.action === "TRANSITION");
+    const targetBlueprint = pedStep.visualIntent.macroBlueprint || layoutCtx.sceneBlueprint || "process_flow";
+    if (i > 0 && !stepHasTransition && targetBlueprint !== layoutCtx.sceneBlueprint) {
+      const transCmd: ChoreographerTransitionCommand = {
+        id: `trans_scene_${i}`,
+        action: "TRANSITION",
+        anchor: { wordIndex: 0, offsetMs: -150 },
+        technique: "fade",
+        preserve: [],
+        nextBlueprint: targetBlueprint,
+      };
+      choreoData.commands.unshift(transCmd);
+    }
+
     // Update layout context scene blueprint and localized labels
-    layoutCtx.sceneBlueprint = pedStep.visualIntent.macroBlueprint || "process_flow";
+    layoutCtx.sceneBlueprint = targetBlueprint;
     Object.assign(layoutCtx.labels, choreoData.labels);
 
     // Compile Anchors -> startMs
@@ -203,7 +287,15 @@ export async function* streamLessonManifest(
           targetIds: cmd.targetIds,
           technique: cmd.technique,
         });
-        // Set exitMs for erased elements
+        // Set exitMs for erased elements across all previous steps + current step
+        const eraseGlobalMs = stepOffsets[i] + startMs;
+        for (let k = 0; k < i; k++) {
+          for (const prevCmd of compiledSteps[k].commands) {
+            if (cmd.targetIds.includes(prevCmd.id)) {
+              prevCmd.exitMs = Math.max(0, eraseGlobalMs - stepOffsets[k]);
+            }
+          }
+        }
         for (const prevCmd of compiledCommands) {
           if (cmd.targetIds.includes(prevCmd.id)) {
             prevCmd.exitMs = startMs;
@@ -222,15 +314,34 @@ export async function* streamLessonManifest(
           nextBlueprint: cmd.nextBlueprint,
         });
 
-        // Set exitMs for non-preserved elements
+        // Set exitMs for non-preserved elements across all previous steps + current step
         const preservedSet = new Set(cmd.preserve);
+        const transGlobalMs = stepOffsets[i] + startMs;
+
+        for (let k = 0; k < i; k++) {
+          for (const prevCmd of compiledSteps[k].commands) {
+            if (prevCmd.action === "DRAW" && !preservedSet.has(prevCmd.id) && (prevCmd.exitMs === undefined || prevCmd.exitMs === Infinity)) {
+              prevCmd.exitMs = Math.max(0, transGlobalMs - stepOffsets[k]);
+            }
+          }
+        }
+
         for (const prevCmd of compiledCommands) {
           if (prevCmd.action === "DRAW" && !preservedSet.has(prevCmd.id) && (prevCmd.exitMs === undefined || prevCmd.exitMs === Infinity)) {
             prevCmd.exitMs = startMs;
           }
         }
+
+        // Snap preserved elements to finished state
+        for (const pid of cmd.preserve) {
+          drawnElementIds.add(pid);
+        }
+
         if (cmd.nextBlueprint) {
           layoutCtx.sceneBlueprint = cmd.nextBlueprint;
+          if (layoutCtx.slotElementCounts) {
+            layoutCtx.slotElementCounts.clear();
+          }
         }
       }
     }

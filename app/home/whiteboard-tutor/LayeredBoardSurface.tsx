@@ -147,7 +147,7 @@ export default function LayeredBoardSurface({
 
   const currentStep = manifest?.steps[step];
 
-  const isV2 = manifest?.version === "2.0.0" || manifest?.manifestVersion === 2;
+  const isV2 = manifest?.manifestVersion === 2 || manifest?.version === "2.0.0";
 
   // Camera follow logic
   useEffect(() => {
@@ -272,41 +272,84 @@ export default function LayeredBoardSurface({
 
           {/* Layer 2: Dynamic Vector Layer */}
           <g id="layer-vectors">
-            {manifest.steps.slice(0, step + 1).map((st, i) => {
-              const isPastStep = i < step;
-
-              return (
-                <g key={`step-${i}`} transform={isV2 ? undefined : `translate(${i * PANEL},0)`}>
+            {isV2 ? (
+              // Pure V2 Playboard: Elements rendered strictly by [enterMs, exitMs) lifetime
+              manifest.steps.map((st) => (
+                <g key={`step-${st.stepIndex}`}>
                   {st.commands.map((cmd) => {
                     if (cmd.action !== "DRAW") return null;
 
-                    const eraseP =
-                      activeEngineState?.eraseProgress?.get(cmd.id) ??
-                      (activeEngineState?.erasedElementIds.has(cmd.id) ? 1.0 : 0.0);
-                    if (eraseP >= 1.0) return null;
+                    if (activeEngineState) {
+                      const eraseP =
+                        activeEngineState.eraseProgress.get(cmd.id) ??
+                        (activeEngineState.erasedElementIds.has(cmd.id) ? 1.0 : 0.0);
+                      if (eraseP >= 1.0) return null;
 
-                    const isCompleted = isPastStep || Boolean(activeEngineState?.completedCommandIds.has(cmd.id));
-                    const isActive = !isPastStep && Boolean(activeEngineState?.activeCommandIds.has(cmd.id));
+                      const isCompleted = activeEngineState.completedCommandIds.has(cmd.id);
+                      const isActive = activeEngineState.activeCommandIds.has(cmd.id);
+                      if (!isCompleted && !isActive) return null;
 
-                    // If neither completed nor active, command hasn't occurred yet
-                    if (!isCompleted && !isActive) return null;
+                      const progress = activeEngineState.commandProgress.get(cmd.id) ?? (isCompleted ? 1.0 : 0.0);
 
-                    const progress = isPastStep
-                      ? 1.0
-                      : activeEngineState?.commandProgress?.get(cmd.id) ?? (isCompleted ? 1.0 : 0.0);
+                      return (
+                        <AnimatedVector
+                          key={cmd.id}
+                          cmd={cmd}
+                          progress={progress}
+                          eraseProgress={eraseP}
+                        />
+                      );
+                    }
 
+                    // Static / SSR fallback when engine is not yet connected
+                    if (st.stepIndex > step) return null;
                     return (
                       <AnimatedVector
                         key={cmd.id}
                         cmd={cmd}
-                        progress={progress}
-                        eraseProgress={eraseP}
+                        progress={1.0}
+                        eraseProgress={0.0}
                       />
                     );
                   })}
                 </g>
-              );
-            })}
+              ))
+            ) : (
+              // Legacy V1 multi-panel layout with horizontal PANEL offsets
+              manifest.steps.slice(0, step + 1).map((st, i) => {
+                const isPastStep = i < step;
+                return (
+                  <g key={`step-${i}`} transform={`translate(${i * PANEL},0)`}>
+                    {st.commands.map((cmd) => {
+                      if (cmd.action !== "DRAW") return null;
+
+                      const eraseP =
+                        activeEngineState?.eraseProgress?.get(cmd.id) ??
+                        (activeEngineState?.erasedElementIds.has(cmd.id) ? 1.0 : 0.0);
+                      if (eraseP >= 1.0) return null;
+
+                      const isCompleted = isPastStep || Boolean(activeEngineState?.completedCommandIds.has(cmd.id));
+                      const isActive = !isPastStep && Boolean(activeEngineState?.activeCommandIds.has(cmd.id));
+
+                      if (!isCompleted && !isActive) return null;
+
+                      const progress = isPastStep
+                        ? 1.0
+                        : activeEngineState?.commandProgress?.get(cmd.id) ?? (isCompleted ? 1.0 : 0.0);
+
+                      return (
+                        <AnimatedVector
+                          key={cmd.id}
+                          cmd={cmd}
+                          progress={progress}
+                          eraseProgress={eraseP}
+                        />
+                      );
+                    })}
+                  </g>
+                );
+              })
+            )}
           </g>
 
           {/* Layer 3: Interactive Annotation Layer (Highlights & Stylus) */}

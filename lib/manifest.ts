@@ -335,6 +335,8 @@ export function boardScriptToManifest(script: BoardScript, stepDurationsMs?: num
         action: "DRAW",
         startMs,
         durationMs: Math.max(300, Math.min(1200, Math.round(durationMs / Math.max(1, n)))),
+        enterMs: startMs,
+        exitMs: sIdx < script.steps.length - 1 ? durationMs : Infinity,
         shape,
         color: shape.color,
       });
@@ -356,7 +358,8 @@ export function boardScriptToManifest(script: BoardScript, stepDurationsMs?: num
   });
 
   return {
-    version: "1.0.0",
+    version: "2.0.0",
+    manifestVersion: 2,
     lessonId: `legacy-${Date.now()}`,
     language: lang,
     title: script.title,

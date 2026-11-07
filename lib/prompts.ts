@@ -184,3 +184,146 @@ Reply with ONE JSON object and nothing else:
   "commands": [ ... ]
 }`;
 }
+
+// 3. Unified Whole-Lesson Choreographer Prompt (Single 1.5k token call for entire lesson)
+export function allStepsChoreographerPrompt(
+  title: string,
+  macroBlueprint: string,
+  steps: Array<{
+    stepIndex: number;
+    say: string;
+    tokens: Array<{ wordIndex: number; text: string }>;
+    visualIntent: { concept: string; keyTerms: string[]; boardEndState?: string };
+  }>,
+  language: string
+): string {
+  const langConfig = getLanguageConfig(language);
+  const bp = macroBlueprint || "process_flow";
+
+  const stepsText = steps
+    .map(
+      (s) => `--- STEP ${s.stepIndex} ---
+Spoken Script: "${s.say}"
+Tokens: ${s.tokens.map((t) => `[${t.wordIndex}]: "${t.text}"`).join(", ")}
+Visual Intent Concept: ${s.visualIntent.concept}
+Key Terms: ${s.visualIntent.keyTerms.join(", ")}`
+    )
+    .join("\n\n");
+
+  return `You are StepWise Choreographer Agent. You translate pedagogical intent for ALL steps of the lesson into timed visual whiteboard actions.
+You DO NOT emit coordinates, startMs, durations, or raw SVG paths.
+You emit ONLY semantic objects, anchors referencing wordIndex, blueprint slot assignments, and a localized "labels" text dictionary.
+
+Lesson: "${title}"
+Active Blueprint: "${bp}"
+Blueprint Slots:
+- process_flow: "banner", "inputs" (cap: 3), "core_subject" (cap: 1), "outputs" (cap: 3)
+- anatomy_structure: "banner", "left_callouts" (cap: 4), "core_subject" (cap: 1), "right_callouts" (cap: 4)
+- mathematical_derivation: "banner", "vertical_steps" (cap: 5), "justifications" (cap: 5)
+- comparison: "banner", "split_left" (cap: 4), "split_right" (cap: 4)
+- cycle: "banner", "central_concept" (cap: 1), "cycle_nodes" (cap: 6)
+
+${stepsText}
+
+Available Actions:
+1. DRAW:
+   - semanticObject:
+     * {"type": "circle", "size": "sm"|"md"|"lg", "slotId"?: string}
+     * {"type": "rect", "size": "sm"|"md"|"lg", "slotId"?: string}
+     * {"type": "label", "labelKey": string, "noteKey"?: string, "attachToId"?: string, "slotId"?: string}
+     * {"type": "line"|"arrow", "from": {"elementId": string, "port"?: "N"|"S"|"E"|"W"|"NE"|"NW"|"SE"|"SW"}, "to": {"elementId": string, "port"?: "N"|"S"|"E"|"W"|"NE"|"NW"|"SE"|"SW"}}
+     * {"type": "triangle", "kind": "right"|"equilateral"|"generic", "slotId"?: string}
+     * {"type": "number_line", "min": number, "max": number, "step": number, "slotId"?: string}
+     * {"type": "formula", "latex": string, "slotId"?: string}
+   - color: "ink" | "purple" | "orange" | "green" | "red" | "blue"
+2. HIGHLIGHT: {"targetId": string (must be drawn in this or prior steps), "style": "pulse"|"marker"}
+3. ERASE: {"targetIds": string[], "technique": "fade"|"reverse_dash"}
+4. TRANSITION: {"technique": "fade", "preserve": string[] (persistent IDs), "nextBlueprint"?: string}
+
+Connector Docking Rules:
+- Connectors MUST specify "from": {"elementId": "..."} and "to": {"elementId": "..."}.
+- Both endpoint element IDs MUST exist on the board.
+- If "port" is omitted, the engine automatically selects facing docking ports.
+
+Scene & Transition Rules:
+- A scene is the span between two TRANSITIONs.
+- When shifting focus to a new visual concept, or when slots are full, emit a TRANSITION action with "preserve" listing element IDs to keep alive into the next scene, or empty [] to clear the board.
+- Slots have strict capacities: "core_subject" (cap: 1), "inputs" (cap: 3), "outputs" (cap: 3). Never exceed slot capacity without a TRANSITION.
+
+Anchoring Rules:
+- Every command MUST have an "anchor": {"wordIndex": integer, "offsetMs": -150}.
+- Anchor to the wordIndex in THAT STEP where the term is spoken. Default offsetMs to -150.
+
+Language:
+- Write all visual label text in "labels" in ${langConfig.name}.
+
+Worked Example for Photosynthesis ("process_flow"):
+{
+  "steps": [
+    {
+      "stepIndex": 0,
+      "labels": {
+        "leaf_label": "Leaf",
+        "sun_label": "Sunlight"
+      },
+      "commands": [
+        {
+          "id": "elem_leaf",
+          "action": "DRAW",
+          "anchor": {"wordIndex": 1, "offsetMs": -150},
+          "semanticObject": {"type": "circle", "size": "lg", "slotId": "core_subject"},
+          "color": "green"
+        },
+        {
+          "id": "elem_sun",
+          "action": "DRAW",
+          "anchor": {"wordIndex": 4, "offsetMs": -150},
+          "semanticObject": {"type": "circle", "size": "sm", "slotId": "inputs"},
+          "color": "orange"
+        },
+        {
+          "id": "conn_sun_leaf",
+          "action": "DRAW",
+          "anchor": {"wordIndex": 5, "offsetMs": -150},
+          "semanticObject": {"type": "arrow", "from": {"elementId": "elem_sun"}, "to": {"elementId": "elem_leaf"}},
+          "color": "orange"
+        }
+      ]
+    },
+    {
+      "stepIndex": 1,
+      "labels": {
+        "sugar_label": "Glucose"
+      },
+      "commands": [
+        {
+          "id": "elem_sugar",
+          "action": "DRAW",
+          "anchor": {"wordIndex": 2, "offsetMs": -150},
+          "semanticObject": {"type": "rect", "size": "sm", "slotId": "outputs"},
+          "color": "green"
+        },
+        {
+          "id": "conn_leaf_sugar",
+          "action": "DRAW",
+          "anchor": {"wordIndex": 3, "offsetMs": -150},
+          "semanticObject": {"type": "arrow", "from": {"elementId": "elem_leaf"}, "to": {"elementId": "elem_sugar"}},
+          "color": "green"
+        }
+      ]
+    }
+  ]
+}
+
+Reply with ONE JSON object containing all steps:
+{
+  "steps": [
+    {
+      "stepIndex": 0,
+      "labels": { ... },
+      "commands": [ ... ]
+    },
+    ...
+  ]
+}`;
+}

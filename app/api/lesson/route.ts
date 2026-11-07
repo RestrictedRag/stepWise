@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   // For doubts, use targeted short doubt generator
   if (parsed.doubt) {
     const { script, fallback } = await generateLesson(parsed, (msgs) =>
-      llmText(msgs, { temperature: 0.3, json: true, max_tokens: 8192 })
+      llmText(msgs, { temperature: 0.3, json: true, max_tokens: 1536 })
     );
     const manifest = boardScriptToManifest(script);
     return Response.json({ manifest, script, fallback });
@@ -20,7 +20,7 @@ export async function POST(req: Request) {
 
   // Multi-Stage Animation Pipeline: Pedagogy Agent -> Parallel TTS/Alignment -> Choreographer Agent -> Validator
   try {
-    const ask = (msgs: any[]) => llmText(msgs, { temperature: 0.3, json: true, max_tokens: 8192 });
+    const ask = (msgs: any[], maxTokens = 1200) => llmText(msgs, { temperature: 0.3, json: true, max_tokens: maxTokens });
     const generator = streamLessonManifest(parsed, ask);
 
     let result = await generator.next();
@@ -30,9 +30,10 @@ export async function POST(req: Request) {
     const manifest = result.value;
     return Response.json({ manifest });
   } catch (err) {
+    console.error("streamLessonManifest FAILED with error:", err);
     // Robust fallback to generateLesson + boardScriptToManifest
     const { script, fallback } = await generateLesson(parsed, (msgs) =>
-      llmText(msgs, { temperature: 0.3, json: true, max_tokens: 8192 })
+      llmText(msgs, { temperature: 0.3, json: true, max_tokens: 1200 })
     );
     const manifest = boardScriptToManifest(script);
     return Response.json({ manifest, script, fallback });
