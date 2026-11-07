@@ -267,43 +267,54 @@ export class GlobalPlaybackEngine {
     const highlightedElementIds = new Map<string, { style: string; intensity: number }>();
     const erasedElementIds = new Set<string>();
 
-    // Evaluate all commands up to the current global time deterministically
-    for (let s = 0; s <= stepIdx; s++) {
+    // Evaluate all commands deterministically based on pure [enterMs, exitMs) intervals
+    for (let s = 0; s < this.steps.length; s++) {
       const step = this.steps[s];
       const offset = this.stepOffsets[s];
 
       for (const cmd of step.commands) {
-        const cmdGlobalStart = offset + cmd.startMs;
-        const cmdGlobalEnd = cmdGlobalStart + cmd.durationMs;
+        const cmdEnter = cmd.enterMs !== undefined ? offset + cmd.enterMs : offset + cmd.startMs;
+        const cmdExit = cmd.exitMs !== undefined && cmd.exitMs !== Infinity ? offset + cmd.exitMs : Infinity;
+        const cmdDrawDuration = Math.max(1, cmd.durationMs);
 
-        if (globalMs >= cmdGlobalEnd) {
-          completedCommandIds.add(cmd.id);
-          commandProgress.set(cmd.id, 1.0);
-          if (cmd.action === "ERASE") {
-            cmd.targetIds.forEach((tid) => {
-              erasedElementIds.add(tid);
-              eraseProgress.set(tid, 1.0);
-            });
-          }
-        } else if (globalMs >= cmdGlobalStart) {
+        // Check ERASE targets
+        if (cmd.action === "ERASE" && globalMs >= cmdEnter) {
+          const eraseProg = Math.max(0, Math.min(1, (globalMs - cmdEnter) / cmdDrawDuration));
+          cmd.targetIds.forEach((tid) => {
+            const curP = eraseProgress.get(tid) ?? 0;
+            eraseProgress.set(tid, Math.max(curP, eraseProg));
+            if (eraseProg >= 0.99) erasedElementIds.add(tid);
+          });
+        }
+
+        if (globalMs < cmdEnter) {
+          commandProgress.set(cmd.id, 0.0);
+        } else if (globalMs < cmdEnter + cmdDrawDuration) {
           activeCommandIds.add(cmd.id);
-          const progress = Math.max(0, Math.min(1, (globalMs - cmdGlobalStart) / Math.max(1, cmd.durationMs)));
+          const progress = (globalMs - cmdEnter) / cmdDrawDuration;
           commandProgress.set(cmd.id, progress);
 
           if (cmd.action === "HIGHLIGHT") {
             highlightedElementIds.set(cmd.targetId, {
               style: cmd.style,
-              intensity: Math.sin(progress * Math.PI), // pulse arc
-            });
-          } else if (cmd.action === "ERASE") {
-            // Reversible fade-based erase: elements fade out
-            cmd.targetIds.forEach((tid) => {
-              eraseProgress.set(tid, progress);
-              if (progress >= 0.95) erasedElementIds.add(tid);
+              intensity: Math.sin(progress * Math.PI),
             });
           }
         } else {
-          commandProgress.set(cmd.id, 0.0);
+          // Drawing completed
+          completedCommandIds.add(cmd.id);
+          commandProgress.set(cmd.id, 1.0);
+
+          // Check pure 300ms exit fade for elements transitioning out
+          if (globalMs >= cmdExit) {
+            const exitElapsed = globalMs - cmdExit;
+            const fadeProgress = Math.max(0, Math.min(1, exitElapsed / 300));
+            const curEraseP = eraseProgress.get(cmd.id) ?? 0;
+            eraseProgress.set(cmd.id, Math.max(curEraseP, fadeProgress));
+            if (fadeProgress >= 0.99) {
+              erasedElementIds.add(cmd.id);
+            }
+          }
         }
       }
     }

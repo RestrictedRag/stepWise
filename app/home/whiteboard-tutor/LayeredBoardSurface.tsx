@@ -147,11 +147,20 @@ export default function LayeredBoardSurface({
 
   const currentStep = manifest?.steps[step];
 
+  const isV2 = manifest?.version === "2.0.0" || manifest?.manifestVersion === 2;
+
   // Camera follow logic
   useEffect(() => {
     if (!follow || !size.w || !currentStep) return;
 
-    // Check if an engine CAMERA_ZOOM viewport is active
+    if (isV2) {
+      // Fixed 1000x700 viewport centering without horizontal step drifting
+      const s = Math.min(size.w / 1000, size.h / 700);
+      setCam({ x: 500 - size.w / (2 * s), y: 350 - size.h / (2 * s), s });
+      return;
+    }
+
+    // Legacy v1 camera follow logic
     if (activeEngineState?.cameraViewport) {
       const { x, y, width, height } = activeEngineState.cameraViewport;
       const x0 = x + step * PANEL;
@@ -169,7 +178,7 @@ export default function LayeredBoardSurface({
     const x0 = bx + step * PANEL;
     const s = Math.min(size.w / bw, size.h / bh);
     setCam({ x: x0 + bw / 2 - size.w / (2 * s), y: by + bh / 2 - size.h / (2 * s), s });
-  }, [follow, step, size, currentStep, activeEngineState?.cameraViewport]);
+  }, [follow, step, size, currentStep, isV2, activeEngineState?.cameraViewport]);
 
   function zoomBy(f: number) {
     setCam((c) => {
@@ -249,7 +258,7 @@ export default function LayeredBoardSurface({
             )}
 
             {asks?.map((a, k) => (
-              <g key={"ask" + k} transform={`translate(${a.at * PANEL + 40},130)`}>
+              <g key={"ask" + k} transform={isV2 ? `translate(40,130)` : `translate(${a.at * PANEL + 40},130)`}>
                 <rect width={360} height={56} rx={12} fill="var(--bg)" stroke="var(--line)" />
                 <text x={14} y={20} fontSize={11} fill="var(--muted)">
                   YOUR QUESTION
@@ -267,7 +276,7 @@ export default function LayeredBoardSurface({
               const isPastStep = i < step;
 
               return (
-                <g key={`step-${i}`} transform={`translate(${i * PANEL},0)`}>
+                <g key={`step-${i}`} transform={isV2 ? undefined : `translate(${i * PANEL},0)`}>
                   {st.commands.map((cmd) => {
                     if (cmd.action !== "DRAW") return null;
 
@@ -301,7 +310,7 @@ export default function LayeredBoardSurface({
           </g>
 
           {/* Layer 3: Interactive Annotation Layer (Highlights & Stylus) */}
-          <g id="layer-annotations" transform={`translate(${step * PANEL},0)`}>
+          <g id="layer-annotations" transform={isV2 ? undefined : `translate(${step * PANEL},0)`}>
             {/* Dynamic Highlights */}
             {activeEngineState &&
               Array.from(activeEngineState.highlightedElementIds.entries()).map(([elemId, hl]) => (
