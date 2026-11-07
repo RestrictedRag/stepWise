@@ -21,11 +21,9 @@ export function getTtsProvider(lang: string): TtsProvider {
   const config = getLanguageConfig(lang);
 
   if (config.ttsProvider === "gnani") {
-    // If running in test or local without GNANI_API_KEY, check environment
+    // If running in test or local without GNANI_API_KEY, gracefully use MockTtsProvider
     if (!process.env.GNANI_API_KEY && !process.env.EVON_API_KEY) {
-      if (process.env.NODE_ENV === "test") {
-        return mockTtsProvider;
-      }
+      return mockTtsProvider;
     }
     return gnaniProvider;
   }
@@ -40,3 +38,4 @@ export function getTtsProvider(lang: string): TtsProvider {
 
   throw new Error(`Unknown TTS provider type '${config.ttsProvider}' for language '${lang}'`);
 }
+

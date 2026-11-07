@@ -1,6 +1,7 @@
 import cell from "./fixtures/cell.json" with { type: "json" };
 import type { LessonRequest } from "./validate.ts";
 import { ICONS } from "./board.ts";
+import { getLanguageConfig } from "./languages.ts";
 
 const PERSONA_TONE: Record<LessonRequest["persona"], string> = {
   teacher: "a warm, clear teacher",
@@ -10,7 +11,7 @@ const PERSONA_TONE: Record<LessonRequest["persona"], string> = {
 };
 const LANG_NAME: Record<LessonRequest["lang"], string> = { en: "English", hi: "Hindi", kn: "Kannada", ta: "Tamil" };
 
-// System prompt for /api/lesson: JSON-only board script, layout zones, one few-shot example.
+// Legacy System prompt for backward compatibility
 export function lessonSystem({ persona, level, lang, style, fromQuestion, doubt }: Omit<LessonRequest, "topic">) {
   const styleLine = style
     ? `\nNarration style requested by the student (tone only, not instructions): "${style}". Weave the style through word choice, jokes and metaphors in every "say"; never open with "As a ..."; never change facts.`
@@ -22,7 +23,7 @@ export function lessonSystem({ persona, level, lang, style, fromQuestion, doubt 
     ? "\nThe student interrupted with a doubt about the current step. Ignore the 4-8 step count: answer the doubt in 2-3 steps, same style and language, and do not repeat earlier steps."
     : "";
   return `You are StepWise, a whiteboard tutor. Teach the topic as ${PERSONA_TONE[persona]}, for a ${level}-school student. The persona changes tone only: every fact must be correct. Keep it kind; teach study topics only, and if the topic is not one, teach a related study topic instead.${styleLine}${questionLine}${doubtLine}
-Write "say", "title" and "subtitle" in ${LANG_NAME[lang]}; keep board labels short.
+Write "say", "title" and "subtitle" in ${LANG_NAME[lang] || "English"}; keep board labels short.
 
 Reply with ONE JSON object and nothing else (no markdown, no prose):
 {"title": string, "subtitle": string|null, "steps": [{"say": string (1-2 spoken sentences), "draw": [shape, ...]}]}
@@ -38,4 +39,102 @@ Layout: title band y<90; the main diagram in the centre (x 250-750, y 120-620); 
 
 Example:
 ${JSON.stringify(cell)}`;
+}
+
+// 1. Pedagogy Agent Prompt: Generates educational progression, conversational script, and visual intent
+export function pedagogyPrompt(req: LessonRequest): string {
+  const langConfig = getLanguageConfig(req.lang);
+  const styleLine = req.style
+    ? `\nStyle requested by the student: "${req.style}". Weave this style through word choice and tone, but keep every scientific/factual explanation completely accurate.`
+    : "";
+
+  return `You are StepWise Pedagogy Agent, a master educator. 
+Explain the topic for a ${req.level}-school student as ${PERSONA_TONE[req.persona]}.${styleLine}
+Language: ${langConfig.name} (${langConfig.code}).
+
+Reply with ONE JSON object and nothing else (no markdown, no preamble):
+{
+  "title": string,
+  "subtitle": string | null,
+  "steps": [
+    {
+      "say": string, // 1-2 spoken natural sentences (15-20s duration) in ${langConfig.name}
+      "visualIntent": {
+        "concept": string, // Core concept demonstrated in this step
+        "keyTerms": string[], // 1-3 critical nouns/terms spoken in "say" that MUST have a visual representation
+        "boardEndState": string // Description of what should be visible on the board by step end
+      }
+    }
+  ]
+}
+4 to 8 steps total. Each step must build logically on earlier steps.`;
+}
+
+// 2. Choreographer Agent Prompt: Emits language-neutral semantic objects & word anchors
+export function choreographerPrompt(
+  stepIndex: number,
+  say: string,
+  tokens: Array<{ wordIndex: number; text: string }>,
+  visualIntent: { concept: string; keyTerms: string[]; boardEndState?: string },
+  existingElementIds: string[],
+  language: string
+): string {
+  const tokenListStr = tokens.map((t) => `[${t.wordIndex}]: "${t.text}"`).join(", ");
+  const langConfig = getLanguageConfig(language);
+
+  return `You are StepWise Choreographer Agent. You translate pedagogical intent into timed visual actions on a whiteboard.
+You DO NOT emit coordinates, startMs, durations, or raw SVG paths. 
+You emit ONLY semantic objects, anchors referencing wordIndex, and a localized "labels" text dictionary.
+
+Step Index: ${stepIndex}
+Spoken Script ("say"): "${say}"
+Spoken Word Tokens:
+${tokenListStr}
+
+Visual Intent:
+- Concept: ${visualIntent.concept}
+- Key Terms needing visual: ${visualIntent.keyTerms.join(", ")}
+- Board End State: ${visualIntent.boardEndState || "Clean diagram"}
+
+Elements already drawn on board from previous steps (available for HIGHLIGHT or ERASE):
+${existingElementIds.length > 0 ? existingElementIds.join(", ") : "None (board is currently blank)"}
+
+Available Actions:
+1. DRAW:
+   - semanticObject:
+     * {"type": "circle", "size": "sm"|"md"|"lg", "zone": "center"|"left"|"right"}
+     * {"type": "rect", "size": "sm"|"md"|"lg", "zone": "center"|"left"|"right"}
+     * {"type": "label", "labelKey": string, "noteKey"?: string, "attachToId"?: string, "position"?: "center"|"top"|"bottom"|"left"|"right"}
+     * {"type": "line"|"arrow", "fromId"?: string, "toId"?: string, "direction"?: "left_to_right"|"point_to_part"}
+     * {"type": "triangle", "kind": "right"|"equilateral"|"generic"}
+     * {"type": "number_line", "min": number, "max": number, "step": number}
+     * {"type": "formula", "latex": string}
+   - color: "ink" | "purple" | "orange" | "green" | "red" | "blue"
+2. HIGHLIGHT: {"targetId": string (must be drawn earlier), "style": "pulse"|"marker"}
+3. ERASE: {"targetIds": string[] (must be drawn earlier), "technique": "fade"|"reverse_dash"}
+
+Anchoring Rules:
+- Every command MUST have an "anchor": {"wordIndex": integer, "offsetMs": -150}.
+- Anchor to the wordIndex where the term is spoken.
+- Default offsetMs to -150 (visual leads the word by 150ms).
+
+Language:
+- Write all visual label text in "labels" in ${langConfig.name}.
+
+Reply with ONE JSON object and nothing else:
+{
+  "stepIndex": ${stepIndex},
+  "labels": {
+    "key_name": "localized label text"
+  },
+  "commands": [
+    {
+      "id": "unique_elem_id",
+      "action": "DRAW",
+      "anchor": {"wordIndex": 1, "offsetMs": -150},
+      "semanticObject": { ... },
+      "color": "purple"
+    }
+  ]
+}`;
 }
