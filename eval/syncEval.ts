@@ -113,7 +113,7 @@ function createEvalAsk(lang: string) {
   };
 }
 
-async function evaluateLanguage(lang: string, topic: string): Promise<EvalResult[]> {
+async function evaluateLanguage(lang: LessonRequest["lang"], topic: string): Promise<EvalResult[]> {
   const req: LessonRequest = {
     topic,
     persona: "teacher",
@@ -167,8 +167,8 @@ async function verifyDegradedFallback() {
   console.log("\n=================== Degraded Fallback Verification ===================");
   const degradedClient = new HybridAlignerClient("http://127.0.0.1:9999"); // non-existent port
   const tokens = [
-    { wordIndex: 0, text: "Fallback", startChar: 0, endChar: 8 },
-    { wordIndex: 1, text: "timing", startChar: 9, endChar: 15 },
+    { wordIndex: 0, text: "Fallback", startChar: 0, endChar: 8, characterSpans: [] },
+    { wordIndex: 1, text: "timing", startChar: 9, endChar: 15, characterSpans: [] },
   ];
   const audio = new Uint8Array([0, 1, 2, 3]);
 

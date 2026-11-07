@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import { focusBox, type BoardScript, type Color } from "../../../lib/board";
-import { boardScriptToManifest, type LessonManifest, type VectorCommand, type DrawCommand } from "../../../lib/manifest";
+import { boardScriptToManifest, type LessonManifest, type CompiledDrawCommand } from "../../../lib/manifest";
 import { GlobalPlaybackEngine, type GlobalEngineState } from "../../../lib/engine/playbackEngine";
 import { isStroke, renderShape } from "./shapes";
 import VirtualStylus from "./VirtualStylus";
@@ -162,7 +162,7 @@ export default function LayeredBoardSurface({
 
     // Default focusBox centering
     const shapes = currentStep.commands
-      .filter((c): c is DrawCommand => c.action === "DRAW")
+      .filter((c): c is CompiledDrawCommand => c.action === "DRAW")
       .map((c) => c.shape as any);
 
     const [bx, by, bw, bh] = focusBox(shapes);
