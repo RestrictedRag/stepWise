@@ -127,7 +127,7 @@ class ForcedAlignerEngine:
         self.cache[cache_key] = result
         return result
 
-    def _interpolate_timings(self, marks: List[Dict[str, Any]], total_audio_ms: number) -> List[Dict[str, Any]]:
+    def _interpolate_timings(self, marks: List[Dict[str, Any]], total_audio_ms: int) -> List[Dict[str, Any]]:
         n = len(marks)
         if n == 0:
             return marks
