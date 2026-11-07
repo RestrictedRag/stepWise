@@ -98,10 +98,18 @@ test("GlobalPlaybackEngine guarantees deterministic state on bidirectional scrub
   // Scrub 3: Seek forward again to 2500ms
   engine.scrubToGlobalMs(2500);
   const stateForward2 = engine.computeStateAt(2500);
-  // DOM / active state must be strictly equal to fresh seek at 2500ms
-  assert.deepEqual(Array.from(stateForward1.completedCommandIds), Array.from(stateForward2.completedCommandIds));
-  assert.deepEqual(Array.from(stateForward1.erasedElementIds), Array.from(stateForward2.erasedElementIds));
 
+  // Compare against a completely fresh instance that sought straight to 2500ms
+  const freshEngine = new GlobalPlaybackEngine([mockStep0, mockStep1]);
+  const freshState = freshEngine.computeStateAt(2500);
+
+  assert.deepEqual(Array.from(stateForward2.completedCommandIds), Array.from(freshState.completedCommandIds));
+  assert.deepEqual(Array.from(stateForward2.activeCommandIds), Array.from(freshState.activeCommandIds));
+  assert.deepEqual(Array.from(stateForward2.erasedElementIds), Array.from(freshState.erasedElementIds));
+  assert.deepEqual(Array.from(stateForward2.commandProgress.entries()), Array.from(freshState.commandProgress.entries()));
+  assert.deepEqual(Array.from(stateForward2.eraseProgress.entries()), Array.from(freshState.eraseProgress.entries()));
+
+  freshEngine.destroy();
   engine.endScrub(false);
   engine.destroy();
 });
