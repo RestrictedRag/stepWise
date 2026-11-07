@@ -1,89 +1,119 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { StepWisePlaybackEngine } from "./playbackEngine.ts";
-import type { StepManifest } from "../manifest.ts";
+import { GlobalPlaybackEngine } from "./playbackEngine.ts";
+import type { CompiledStepManifest } from "../manifest.ts";
 
-const mockStep: StepManifest = {
+const mockStep0: CompiledStepManifest = {
   stepIndex: 0,
   speech: {
-    durationMs: 4000,
-    transcript: "Let's draw a nucleus, highlight it, and then erase it.",
+    durationMs: 3000,
+    transcript: "Step zero text.",
+    timingSource: "forced_alignment",
+    alignmentConfidence: 1.0,
     speechMarks: [],
   },
   commands: [
     {
-      id: "elem_nucleus",
+      id: "elem_circle",
       action: "DRAW",
-      targetLayer: "dynamicVector",
       startMs: 500,
-      durationMs: 1000,
-      shape: { type: "circle", x: 500, y: 350, r: 50 },
-      style: { color: "purple", showStylus: true },
-    },
-    {
-      id: "elem_highlight",
-      action: "HIGHLIGHT",
-      targetElementId: "elem_nucleus",
-      startMs: 2000,
-      durationMs: 1000,
-      style: "pulse",
+      durationMs: 800,
+      shape: { type: "circle", x: 500, y: 350, r: 80, color: "purple" },
+      color: "purple",
     },
     {
       id: "elem_erase",
       action: "ERASE",
-      targetElementIds: ["elem_nucleus"],
-      startMs: 3500,
+      startMs: 2000,
       durationMs: 400,
-      technique: "mask_wipe",
+      targetIds: ["elem_circle"],
+      technique: "fade",
     },
   ],
 };
 
-test("StepWisePlaybackEngine initializes and evaluates state at t=0", () => {
-  const engine = new StepWisePlaybackEngine(mockStep);
-  const state = engine.computeStateAt(0);
-  assert.equal(state.timeMs, 0);
-  assert.equal(state.activeCommandIds.size, 0);
-  assert.equal(state.completedCommandIds.size, 0);
-  assert.equal(state.erasedElementIds.size, 0);
-  assert.equal(state.highlightedElementIds.size, 0);
+const mockStep1: CompiledStepManifest = {
+  stepIndex: 1,
+  speech: {
+    durationMs: 4000,
+    transcript: "Step one text.",
+    timingSource: "forced_alignment",
+    alignmentConfidence: 1.0,
+    speechMarks: [],
+  },
+  commands: [
+    {
+      id: "elem_rect",
+      action: "DRAW",
+      startMs: 400,
+      durationMs: 800,
+      shape: { type: "rect", x: 400, y: 300, w: 200, h: 100, color: "blue" },
+      color: "blue",
+    },
+  ],
+};
+
+test("GlobalPlaybackEngine calculates global timeline and step offsets across steps", () => {
+  const engine = new GlobalPlaybackEngine([mockStep0, mockStep1]);
+  const s0 = engine.computeStateAt(0);
+  assert.equal(s0.totalDurationMs, 7000);
+  assert.equal(s0.stepOffsets[0], 0);
+  assert.equal(s0.stepOffsets[1], 3000);
+
+  // In step 0 (t = 1000ms): circle is actively animating
+  const stateMid0 = engine.computeStateAt(1000);
+  assert.equal(stateMid0.currentStepIndex, 0);
+  assert.ok(stateMid0.activeCommandIds.has("elem_circle"));
+  assert.equal(stateMid0.erasedElementIds.has("elem_circle"), false);
+
+  // At t = 1500ms: circle draw completed, before erase at 2000ms
+  const stateDoneCircle = engine.computeStateAt(1500);
+  assert.ok(stateDoneCircle.completedCommandIds.has("elem_circle"));
+  assert.equal(stateDoneCircle.erasedElementIds.has("elem_circle"), false);
+
+  // In step 1 (t = 4500ms): global time 4500ms -> step 1 local time 1500ms
+  const stateMid1 = engine.computeStateAt(4500);
+  assert.equal(stateMid1.currentStepIndex, 1);
+  assert.equal(stateMid1.stepTimeMs, 1500);
+  assert.ok(stateMid1.completedCommandIds.has("elem_rect"));
+
   engine.destroy();
 });
 
-test("StepWisePlaybackEngine activates DRAW and stylus during drawing window", () => {
-  const engine = new StepWisePlaybackEngine(mockStep);
-  // Nucleus draws between 500ms and 1500ms
-  const state = engine.computeStateAt(1000);
-  assert.ok(state.activeCommandIds.has("elem_nucleus"));
-  assert.ok(state.stylusPosition);
-  assert.equal(state.stylusPosition.active, true);
-  engine.destroy();
-});
+test("GlobalPlaybackEngine guarantees deterministic state on bidirectional scrub (seek forward, backward, forward)", () => {
+  const engine = new GlobalPlaybackEngine([mockStep0, mockStep1]);
 
-test("StepWisePlaybackEngine activates HIGHLIGHT pulse between 2000ms and 3000ms", () => {
-  const engine = new StepWisePlaybackEngine(mockStep);
-  const state = engine.computeStateAt(2500);
-  assert.ok(state.highlightedElementIds.has("elem_nucleus"));
-  assert.ok(state.highlightedElementIds.get("elem_nucleus")!.intensity > 0);
-  engine.destroy();
-});
-
-test("StepWisePlaybackEngine supports bi-directional scrubbing with instant state reconciliation", () => {
-  const engine = new StepWisePlaybackEngine(mockStep);
-  
-  // Scrub forward to past erase (3800ms)
+  // Scrub 1: Seek forward to 2500ms (circle is erased)
   engine.startScrub();
-  engine.scrubToMs(3800);
-  const forwardState = engine.computeStateAt(3800);
-  assert.ok(forwardState.erasedElementIds.has("elem_nucleus"));
+  engine.scrubToGlobalMs(2500);
+  const stateForward1 = engine.computeStateAt(2500);
+  assert.ok(stateForward1.erasedElementIds.has("elem_circle"));
 
-  // Scrub backwards to 1800ms (before erase)
-  engine.scrubToMs(1800);
-  const backwardState = engine.computeStateAt(1800);
-  assert.equal(backwardState.erasedElementIds.has("elem_nucleus"), false);
-  assert.ok(backwardState.completedCommandIds.has("elem_nucleus"));
+  // Scrub 2: Seek backward to 1500ms (before erase was triggered)
+  engine.scrubToGlobalMs(1500);
+  const stateBackward = engine.computeStateAt(1500);
+  assert.equal(stateBackward.erasedElementIds.has("elem_circle"), false);
+  assert.ok(stateBackward.completedCommandIds.has("elem_circle"));
+
+  // Scrub 3: Seek forward again to 2500ms
+  engine.scrubToGlobalMs(2500);
+  const stateForward2 = engine.computeStateAt(2500);
+  // DOM / active state must be strictly equal to fresh seek at 2500ms
+  assert.deepEqual(Array.from(stateForward1.completedCommandIds), Array.from(stateForward2.completedCommandIds));
+  assert.deepEqual(Array.from(stateForward1.erasedElementIds), Array.from(stateForward2.erasedElementIds));
 
   engine.endScrub(false);
   engine.destroy();
 });
 
+test("GlobalPlaybackEngine supports streaming stall and resume when next step arrives", () => {
+  const engine = new GlobalPlaybackEngine([mockStep0]);
+  assert.equal(engine.computeStateAt(0).totalDurationMs, 3000);
+
+  // Append step 1 dynamically as stream arrives
+  engine.appendStep(mockStep1);
+  assert.equal(engine.computeStateAt(0).totalDurationMs, 7000);
+  assert.equal(engine.computeStateAt(0).stepOffsets[1], 3000);
+
+  engine.destroy();
+});
