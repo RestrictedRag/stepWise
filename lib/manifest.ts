@@ -1,112 +1,209 @@
-// StepWise Manifest: The atomic contract between backend choreography and client playback.
-import type { Color, Icon, Shape, Step, BoardScript } from "./board.ts";
+// StepWise Manifest: Zod-validated Schemas for Anchored Choreography & Compiled Engine Playback.
+import { z } from "zod";
+import type { Shape, BoardScript } from "./board.ts";
 
-export const CANVAS_W = 1000;
-export const CANVAS_H = 700;
+export const CANVAS_WIDTH = 1000;
+export const CANVAS_HEIGHT = 700;
+export const CANVAS_W = CANVAS_WIDTH;
+export const CANVAS_H = CANVAS_HEIGHT;
 
-export type ManifestCommandType = "DRAW" | "HIGHLIGHT" | "ERASE" | "CAMERA_ZOOM" | "EXECUTE_SANDBOX";
-
-export interface SpeechMark {
-  timeMs: number;     // Absolute timestamp within audio clip (ms)
-  type: "word";
-  value: string;      // Spoken word
-  startChar: number;
-  endChar: number;
+export function validateLessonManifest(data: unknown): { manifest: LessonManifest | null; errors: string[] } {
+  if (!data || typeof data !== "object") {
+    return { manifest: null, errors: ["Manifest must be an object."] };
+  }
+  const d = data as any;
+  if (!d.title || typeof d.title !== "string") {
+    return { manifest: null, errors: ["Missing or invalid title."] };
+  }
+  if (!Array.isArray(d.steps) || d.steps.length === 0) {
+    return { manifest: null, errors: ["Steps must be a non-empty array."] };
+  }
+  return { manifest: data as LessonManifest, errors: [] };
 }
 
-export interface BaseVectorCommand {
-  id: string;                      // Deterministic unique element ID
-  action: ManifestCommandType;
-  startMs: number;                 // Scheduled start relative to step audio (ms)
-  durationMs: number;              // Animation duration (ms)
-  easing?: string;                 // GSAP easing string (e.g. "power2.out")
-}
+export const ColorSchema = z.enum(["ink", "purple", "orange", "green", "red", "blue"]);
+export type Color = z.infer<typeof ColorSchema>;
 
-export type DrawShapePayload =
-  | { type: "line" | "arrow"; from: [number, number]; to: [number, number]; strokeWidth?: number }
-  | { type: "circle"; x: number; y: number; r: number }
-  | { type: "ellipse"; x: number; y: number; rx: number; ry: number }
-  | { type: "rect"; x: number; y: number; w: number; h: number; rx?: number }
-  | { type: "path"; d: string }
-  | { type: "latex"; x: number; y: number; tex: string; fontSize: number }
-  | { type: "label"; x: number; y: number; text: string; note?: string | null }
-  | { type: "text"; x: number; y: number; text: string; size: number }
-  | { type: "icon"; x: number; y: number; name: Icon };
+// Semantic Objects supported in the first slice (NO raw coordinates from LLM)
+export const SemanticLabelSchema = z.object({
+  type: z.literal("label"),
+  labelKey: z.string(),
+  noteKey: z.string().optional(),
+  attachToId: z.string().optional(),
+  position: z.enum(["center", "top", "bottom", "left", "right", "margin_left", "margin_right"]).optional(),
+});
 
-export interface DrawCommand extends BaseVectorCommand {
+export const SemanticLineSchema = z.object({
+  type: z.enum(["line", "arrow"]),
+  fromId: z.string().optional(),
+  toId: z.string().optional(),
+  direction: z.enum(["left_to_right", "right_to_left", "top_to_bottom", "bottom_to_top", "point_to_part"]).optional(),
+});
+
+export const SemanticCircleSchema = z.object({
+  type: z.literal("circle"),
+  size: z.enum(["sm", "md", "lg"]).default("md"),
+  zone: z.enum(["center", "left", "right"]).default("center"),
+});
+
+export const SemanticRectSchema = z.object({
+  type: z.literal("rect"),
+  size: z.enum(["sm", "md", "lg"]).default("md"),
+  zone: z.enum(["center", "left", "right"]).default("center"),
+});
+
+export const SemanticNumberLineSchema = z.object({
+  type: z.literal("number_line"),
+  min: z.number(),
+  max: z.number(),
+  step: z.number().default(1),
+  highlightValues: z.array(z.number()).optional(),
+});
+
+export const SemanticTriangleSchema = z.object({
+  type: z.literal("triangle"),
+  kind: z.enum(["right", "equilateral", "isosceles", "generic"]).default("generic"),
+  sideLabelKeys: z.array(z.string()).optional(),
+});
+
+export const SemanticFormulaSchema = z.object({
+  type: z.literal("formula"),
+  latex: z.string(),
+});
+
+// Rare escape hatch for custom organic shapes (e.g. organelles)
+export const SemanticPathEscapeSchema = z.object({
+  type: z.literal("path"),
+  d: z.string().regex(/^[MLHVCSQTAZmlhvcsqtaz0-9 ,.\-]{1,2000}$/),
+});
+
+export const SemanticObjectSchema = z.discriminatedUnion("type", [
+  SemanticLabelSchema,
+  SemanticLineSchema,
+  SemanticCircleSchema,
+  SemanticRectSchema,
+  SemanticNumberLineSchema,
+  SemanticTriangleSchema,
+  SemanticFormulaSchema,
+  SemanticPathEscapeSchema,
+]);
+export type SemanticObject = z.infer<typeof SemanticObjectSchema>;
+
+// Anchor linking command to spoken word index with relative offset
+export const AnchorSchema = z.object({
+  wordIndex: z.number().int().min(0),
+  offsetMs: z.number().default(-150), // Default leads the word by 150ms
+});
+export type Anchor = z.infer<typeof AnchorSchema>;
+
+// Choreographer Output Commands (Pre-Compilation)
+export const ChoreographerDrawCommandSchema = z.object({
+  id: z.string(),
+  action: z.literal("DRAW"),
+  anchor: AnchorSchema,
+  semanticObject: SemanticObjectSchema,
+  color: ColorSchema.default("ink"),
+});
+
+export const ChoreographerHighlightCommandSchema = z.object({
+  id: z.string(),
+  action: z.literal("HIGHLIGHT"),
+  anchor: AnchorSchema,
+  targetId: z.string(),
+  style: z.enum(["pulse", "marker"]).default("pulse"),
+});
+
+export const ChoreographerEraseCommandSchema = z.object({
+  id: z.string(),
+  action: z.literal("ERASE"),
+  anchor: AnchorSchema,
+  targetIds: z.array(z.string()).min(1),
+  technique: z.enum(["fade", "reverse_dash"]).default("fade"),
+});
+
+export const ChoreographerCommandSchema = z.discriminatedUnion("action", [
+  ChoreographerDrawCommandSchema,
+  ChoreographerHighlightCommandSchema,
+  ChoreographerEraseCommandSchema,
+]);
+export type ChoreographerCommand = z.infer<typeof ChoreographerCommandSchema>;
+
+export const StepChoreographySchema = z.object({
+  stepIndex: z.number().int().min(0),
+  labels: z.record(z.string(), z.string()), // Localized text map: labelKey -> localized string
+  commands: z.array(ChoreographerCommandSchema),
+});
+export type StepChoreography = z.infer<typeof StepChoreographySchema>;
+
+// Compiled Manifest: Fully resolved timestamps (startMs, durationMs) & 1000x700 coordinates
+export interface CompiledDrawCommand {
+  id: string;
   action: "DRAW";
-  targetLayer: "dynamicVector";
-  shape: DrawShapePayload;
-  style: {
-    color: Color;
-    strokeWidth?: number;
-    dashArray?: number;
-    showStylus?: boolean;
-  };
+  startMs: number;
+  durationMs: number;
+  shape: Shape;
+  color: Color;
 }
 
-export interface HighlightCommand extends BaseVectorCommand {
+export interface CompiledHighlightCommand {
+  id: string;
   action: "HIGHLIGHT";
-  targetElementId: string;         // References previously drawn element ID
-  style: "pulse" | "halo" | "marker_stroke";
-  color?: Color;
-  intensity?: number;
+  startMs: number;
+  durationMs: number;
+  targetId: string;
+  style: "pulse" | "marker";
 }
 
-export interface EraseCommand extends BaseVectorCommand {
+export interface CompiledEraseCommand {
+  id: string;
   action: "ERASE";
-  targetElementIds: string[];      // Element IDs to remove or mask
-  technique: "mask_wipe" | "reverse_stroke" | "scribble_mask";
+  startMs: number;
+  durationMs: number;
+  targetIds: string[];
+  technique: "fade" | "reverse_dash";
 }
 
-export interface CameraZoomCommand extends BaseVectorCommand {
-  action: "CAMERA_ZOOM";
-  targetViewport: { x: number; y: number; width: number; height: number };
-}
+export type CompiledCommand = CompiledDrawCommand | CompiledHighlightCommand | CompiledEraseCommand;
 
-export interface SandboxCommand extends BaseVectorCommand {
-  action: "EXECUTE_SANDBOX";
-  sandboxId: string;
-  widgetType?: "function_plotter" | "coordinate_grid" | "geometry_matrix";
-  params?: Record<string, unknown>;
-  customScriptPayload?: string;
-}
-
-export type VectorCommand =
-  | DrawCommand
-  | HighlightCommand
-  | EraseCommand
-  | CameraZoomCommand
-  | SandboxCommand;
-
-export interface StepManifest {
+export interface CompiledStepManifest {
   stepIndex: number;
   speech: {
     audioUrl?: string;
     durationMs: number;
     transcript: string;
-    speechMarks: SpeechMark[];
+    timingSource: "native_marks" | "forced_alignment" | "syllable_estimate";
+    alignmentConfidence: number;
+    speechMarks: Array<{
+      timeMs: number;
+      type: "word";
+      value: string;
+      startChar: number;
+      endChar: number;
+      confidence?: number;
+    }>;
   };
-  commands: VectorCommand[];
+  commands: CompiledCommand[];
 }
 
 export interface LessonManifest {
+  version: "1.0.0";
   lessonId: string;
+  language: string;
   title: string;
   subtitle?: string | null;
-  steps: StepManifest[];
+  steps: CompiledStepManifest[];
   metadata: {
     generatedAt: string;
-    virtualCanvas: { width: number; height: number };
+    virtualCanvas: { width: 1000; height: 700 };
   };
 }
 
-// Convert legacy BoardScript to LessonManifest for full backward compatibility
-export function boardScriptToManifest(script: BoardScript, stepDurationsMs?: number[]): LessonManifest {
-  const steps: StepManifest[] = script.steps.map((step, sIdx) => {
+// Backward compatibility adapter for legacy fixtures (cell.json, etc.)
+export function boardScriptToManifest(script: BoardScript, stepDurationsMs?: number[], lang: string = "en"): LessonManifest {
+  const steps: CompiledStepManifest[] = script.steps.map((step, sIdx) => {
     const durationMs = stepDurationsMs?.[sIdx] ?? Math.max(3000, step.say.split(/\s+/).length * 400);
     const words = step.say.split(/\s+/).filter(Boolean);
-    const speechMarks: SpeechMark[] = [];
+    const marks: CompiledStepManifest["speech"]["speechMarks"] = [];
     let curChar = 0;
     const msPerWord = words.length > 0 ? durationMs / words.length : durationMs;
 
@@ -115,16 +212,17 @@ export function boardScriptToManifest(script: BoardScript, stepDurationsMs?: num
       const startChar = idx >= 0 ? idx : curChar;
       const endChar = startChar + w.length;
       curChar = endChar;
-      speechMarks.push({
+      marks.push({
         timeMs: Math.round(wIdx * msPerWord),
         type: "word",
         value: w,
         startChar,
         endChar,
+        confidence: 0.5,
       });
     });
 
-    const commands: VectorCommand[] = [];
+    const commands: CompiledCommand[] = [];
     const n = step.draw.length;
 
     step.draw.forEach((shape, shIdx) => {
@@ -133,30 +231,20 @@ export function boardScriptToManifest(script: BoardScript, stepDurationsMs?: num
 
       if (shape.at) {
         const atLower = shape.at.toLowerCase();
-        const mark = speechMarks.find((m) => atLower.includes(m.value.toLowerCase()));
-        if (mark) startMs = mark.timeMs;
+        const mark = marks.find((m) => atLower.includes(m.value.toLowerCase()));
+        if (mark) startMs = Math.max(0, mark.timeMs - 150);
       }
 
-      const drawPayload = shapeToDrawPayload(shape);
-      if (drawPayload) {
-        commands.push({
-          id: elemId,
-          action: "DRAW",
-          targetLayer: "dynamicVector",
-          startMs,
-          durationMs: Math.min(1200, Math.max(500, Math.round(durationMs / Math.max(1, n)))),
-          easing: "power2.out",
-          shape: drawPayload,
-          style: {
-            color: shape.color,
-            strokeWidth: shape.type === "highlight" ? 24 : 3,
-            showStylus: shape.type !== "text" && shape.type !== "label",
-          },
-        });
-      }
+      commands.push({
+        id: elemId,
+        action: "DRAW",
+        startMs,
+        durationMs: Math.max(300, Math.min(1200, Math.round(durationMs / Math.max(1, n)))),
+        shape,
+        color: shape.color,
+      });
     });
 
-    // Sort commands chronologically by startMs
     commands.sort((a, b) => a.startMs - b.startMs);
 
     return {
@@ -164,92 +252,24 @@ export function boardScriptToManifest(script: BoardScript, stepDurationsMs?: num
       speech: {
         durationMs,
         transcript: step.say,
-        speechMarks,
+        timingSource: "syllable_estimate",
+        alignmentConfidence: 0.5,
+        speechMarks: marks,
       },
       commands,
     };
   });
 
   return {
+    version: "1.0.0",
     lessonId: `legacy-${Date.now()}`,
+    language: lang,
     title: script.title,
     subtitle: script.subtitle,
     steps,
     metadata: {
       generatedAt: new Date().toISOString(),
-      virtualCanvas: { width: CANVAS_W, height: CANVAS_H },
+      virtualCanvas: { width: 1000, height: 700 },
     },
   };
 }
-
-function shapeToDrawPayload(shape: Shape): DrawShapePayload | null {
-  switch (shape.type) {
-    case "line":
-    case "arrow":
-    case "highlight":
-      return { type: shape.type === "highlight" ? "line" : shape.type, from: shape.from, to: shape.to };
-    case "circle":
-      return { type: "circle", x: shape.x, y: shape.y, r: shape.r };
-    case "ellipse":
-      return { type: "ellipse", x: shape.x, y: shape.y, rx: shape.rx, ry: shape.ry };
-    case "rect":
-      return { type: "rect", x: shape.x, y: shape.y, w: shape.w, h: shape.h };
-    case "path":
-      return { type: "path", d: shape.d };
-    case "text":
-      return { type: "text", x: shape.x, y: shape.y, text: shape.text, size: shape.size };
-    case "label":
-      return { type: "label", x: shape.x, y: shape.y, text: shape.text, note: shape.note };
-    case "icon":
-      return { type: "icon", x: shape.x, y: shape.y, name: shape.name };
-    default:
-      return null;
-  }
-}
-
-// Validator for StepManifest and LessonManifest
-export function validateLessonManifest(data: unknown): { manifest: LessonManifest | null; errors: string[] } {
-  const errors: string[] = [];
-  if (!data || typeof data !== "object") {
-    return { manifest: null, errors: ["Manifest root must be an object."] };
-  }
-
-  const d = data as Record<string, unknown>;
-  if (typeof d.title !== "string" || !d.title.trim()) {
-    errors.push("Missing or invalid manifest title.");
-  }
-
-  if (!Array.isArray(d.steps) || d.steps.length === 0) {
-    errors.push("Manifest must contain at least one step.");
-  }
-
-  const steps: StepManifest[] = [];
-  if (Array.isArray(d.steps)) {
-    d.steps.forEach((s, i) => {
-      if (!s || typeof s !== "object") {
-        errors.push(`Step [${i}] is not an object.`);
-        return;
-      }
-      const stepObj = s as Record<string, unknown>;
-      const speech = stepObj.speech as Record<string, unknown> | undefined;
-      if (!speech || typeof speech.transcript !== "string") {
-        errors.push(`Step [${i}] missing speech transcript.`);
-      }
-      if (typeof speech?.durationMs !== "number" || speech.durationMs <= 0) {
-        errors.push(`Step [${i}] missing or invalid durationMs.`);
-      }
-      if (!Array.isArray(stepObj.commands)) {
-        errors.push(`Step [${i}] commands must be an array.`);
-      }
-
-      steps.push(s as StepManifest);
-    });
-  }
-
-  if (errors.length > 0) {
-    return { manifest: null, errors };
-  }
-
-  return { manifest: data as LessonManifest, errors: [] };
-}
-
