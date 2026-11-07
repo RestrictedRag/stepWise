@@ -72,30 +72,30 @@ export const SemanticLineSchema = z.object({
 
 export const SemanticCircleSchema = z.object({
   type: z.literal("circle"),
-  size: z.enum(["sm", "md", "lg"]).default("md"),
+  size: z.enum(["sm", "md", "lg"]).optional(),
   slotId: z.string().optional(),
-  zone: z.enum(["center", "left", "right"]).default("center"),
+  zone: z.enum(["center", "left", "right"]).optional(),
 });
 
 export const SemanticRectSchema = z.object({
   type: z.literal("rect"),
-  size: z.enum(["sm", "md", "lg"]).default("md"),
+  size: z.enum(["sm", "md", "lg"]).optional(),
   slotId: z.string().optional(),
-  zone: z.enum(["center", "left", "right"]).default("center"),
+  zone: z.enum(["center", "left", "right"]).optional(),
 });
 
 export const SemanticNumberLineSchema = z.object({
   type: z.literal("number_line"),
   min: z.number(),
   max: z.number(),
-  step: z.number().default(1),
+  step: z.number().optional(),
   slotId: z.string().optional(),
   highlightValues: z.array(z.number()).optional(),
 });
 
 export const SemanticTriangleSchema = z.object({
   type: z.literal("triangle"),
-  kind: z.enum(["right", "equilateral", "isosceles", "generic"]).default("generic"),
+  kind: z.enum(["right", "equilateral", "isosceles", "generic"]).optional(),
   slotId: z.string().optional(),
   sideLabelKeys: z.array(z.string()).optional(),
 });
@@ -109,20 +109,20 @@ export const SemanticFormulaSchema = z.object({
 export const SemanticFunctionPlotterSchema = z.object({
   type: z.literal("function_plotter"),
   f: z.string(),
-  xDomain: z.tuple([z.number(), z.number()]).default([-5, 5]),
-  yDomain: z.tuple([z.number(), z.number()]).default([-5, 5]),
+  xDomain: z.tuple([z.number(), z.number()]).optional(),
+  yDomain: z.tuple([z.number(), z.number()]).optional(),
   slotId: z.string().optional(),
-  zone: z.enum(["center", "left", "right"]).default("center"),
+  zone: z.enum(["center", "left", "right"]).optional(),
 });
 
 export const SemanticCoordinatePlaneSchema = z.object({
   type: z.literal("coordinate_plane"),
-  xDomain: z.tuple([z.number(), z.number()]).default([-5, 5]),
-  yDomain: z.tuple([z.number(), z.number()]).default([-5, 5]),
-  grid: z.boolean().default(true),
+  xDomain: z.tuple([z.number(), z.number()]).optional(),
+  yDomain: z.tuple([z.number(), z.number()]).optional(),
+  grid: z.boolean().optional(),
   slotId: z.string().optional(),
   points: z.array(z.tuple([z.number(), z.number()])).optional(),
-  zone: z.enum(["center", "left", "right"]).default("center"),
+  zone: z.enum(["center", "left", "right"]).optional(),
 });
 
 // Rare escape hatch for custom organic shapes (e.g. organelles)

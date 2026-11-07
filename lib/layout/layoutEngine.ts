@@ -284,8 +284,8 @@ export class LayoutEngine {
       }
 
       case "function_plotter": {
-        const [xMin, xMax] = semanticObj.xDomain;
-        const [yMin, yMax] = semanticObj.yDomain;
+        const [xMin, xMax] = semanticObj.xDomain || [-5, 5];
+        const [yMin, yMax] = semanticObj.yDomain || [-5, 5];
         const xSpan = Math.max(0.1, xMax - xMin);
         const ySpan = Math.max(0.1, yMax - yMin);
 
@@ -327,8 +327,8 @@ export class LayoutEngine {
       }
 
       case "coordinate_plane": {
-        const [xMin, xMax] = semanticObj.xDomain;
-        const [yMin, yMax] = semanticObj.yDomain;
+        const [xMin, xMax] = semanticObj.xDomain || [-5, 5];
+        const [yMin, yMax] = semanticObj.yDomain || [-5, 5];
         const xSpan = Math.max(0.1, xMax - xMin);
         const ySpan = Math.max(0.1, yMax - yMin);
 
