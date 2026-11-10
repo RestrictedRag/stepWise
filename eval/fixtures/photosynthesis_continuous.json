@@ -1,0 +1,271 @@
+{
+  "id": "lesson_photosynthesis_continuous",
+  "topic": "Photosynthesis: How Plants Make Food",
+  "steps": [
+    {
+      "id": "step_1_intro",
+      "narration": "Inside every green plant, the leaf [leaf] serves as a microscopic solar-powered factory.",
+      "ops": [
+        {
+          "op": "DRAW",
+          "anchor": "leaf",
+          "element": {
+            "id": "leaf",
+            "type": "shape",
+            "shapeType": "ellipse",
+            "size": "lg",
+            "placement": {
+              "type": "root",
+              "x": 500,
+              "y": 260
+            },
+            "label": "Leaf (Chloroplast)",
+            "color": "success"
+          }
+        }
+      ]
+    },
+    {
+      "id": "step_2_sunlight",
+      "narration": "To start the reaction, sunlight [sun] beams energy down directly into the chloroplasts.",
+      "ops": [
+        {
+          "op": "DRAW",
+          "anchor": "sun",
+          "element": {
+            "id": "sun",
+            "type": "shape",
+            "shapeType": "circle",
+            "size": "sm",
+            "placement": {
+              "type": "relative",
+              "relativeTo": "leaf",
+              "position": "above-left",
+              "offset": "lg"
+            },
+            "label": "Sun",
+            "color": "warn"
+          }
+        },
+        {
+          "op": "DRAW",
+          "anchor": "sun",
+          "element": {
+            "id": "conn_sun_leaf",
+            "type": "connector",
+            "from": "sun",
+            "to": "leaf",
+            "label": "Light Energy",
+            "color": "warn"
+          }
+        }
+      ]
+    },
+    {
+      "id": "step_3_raw_materials",
+      "narration": "Next, the plant draws in carbon dioxide [co2] from the air, and water [h2o] up through its roots [roots_absorb].",
+      "ops": [
+        {
+          "op": "DRAW",
+          "anchor": "co2",
+          "element": {
+            "id": "co2_in",
+            "type": "text",
+            "text": "CO₂ (from air)",
+            "size": "sm",
+            "placement": {
+              "type": "relative",
+              "relativeTo": "leaf",
+              "position": "left",
+              "offset": "md"
+            },
+            "color": "default"
+          }
+        },
+        {
+          "op": "DRAW",
+          "anchor": "co2",
+          "element": {
+            "id": "conn_co2_leaf",
+            "type": "connector",
+            "from": "co2_in",
+            "to": "leaf",
+            "color": "default"
+          }
+        },
+        {
+          "op": "DRAW",
+          "anchor": "h2o",
+          "element": {
+            "id": "h2o_in",
+            "type": "text",
+            "text": "H₂O (from roots)",
+            "size": "sm",
+            "placement": {
+              "type": "relative",
+              "relativeTo": "leaf",
+              "position": "below",
+              "offset": "md"
+            },
+            "color": "accent"
+          }
+        },
+        {
+          "op": "DRAW",
+          "anchor": "h2o",
+          "element": {
+            "id": "conn_h2o_leaf",
+            "type": "connector",
+            "from": "h2o_in",
+            "to": "leaf",
+            "color": "accent"
+          }
+        },
+        {
+          "op": "CIRCLE",
+          "anchor": "roots_absorb",
+          "targetId": "leaf",
+          "color": "success"
+        }
+      ]
+    },
+    {
+      "id": "step_4_products_and_correction",
+      "narration": "Some believe soil provides the calories [soil_myth], but that's a misconception [strike_myth]. We can clear that away [clear_myth]. The true products are glucose [glucose] and vital oxygen [oxygen].",
+      "ops": [
+        {
+          "op": "DRAW",
+          "anchor": "soil_myth",
+          "element": {
+            "id": "soil_note",
+            "type": "text",
+            "text": "Soil provides food?",
+            "size": "sm",
+            "placement": {
+              "type": "relative",
+              "relativeTo": "leaf",
+              "position": "above-right",
+              "offset": "md"
+            },
+            "color": "muted"
+          }
+        },
+        {
+          "op": "STRIKE",
+          "anchor": "strike_myth",
+          "targetId": "soil_note"
+        },
+        {
+          "op": "ERASE",
+          "anchor": "clear_myth",
+          "targetIds": ["soil_note"]
+        },
+        {
+          "op": "DRAW",
+          "anchor": "glucose",
+          "element": {
+            "id": "glucose_out",
+            "type": "text",
+            "text": "Glucose (Sugar)",
+            "size": "md",
+            "placement": {
+              "type": "relative",
+              "relativeTo": "leaf",
+              "position": "above-right",
+              "offset": "md"
+            },
+            "color": "success"
+          }
+        },
+        {
+          "op": "DRAW",
+          "anchor": "glucose",
+          "element": {
+            "id": "conn_leaf_glucose",
+            "type": "connector",
+            "from": "leaf",
+            "to": "glucose_out",
+            "color": "success"
+          }
+        },
+        {
+          "op": "DRAW",
+          "anchor": "oxygen",
+          "element": {
+            "id": "o2_out",
+            "type": "text",
+            "text": "O₂ (Oxygen gas)",
+            "size": "sm",
+            "placement": {
+              "type": "relative",
+              "relativeTo": "leaf",
+              "position": "right",
+              "offset": "md"
+            },
+            "color": "accent"
+          }
+        },
+        {
+          "op": "DRAW",
+          "anchor": "oxygen",
+          "element": {
+            "id": "conn_leaf_o2",
+            "type": "connector",
+            "from": "leaf",
+            "to": "o2_out",
+            "color": "accent"
+          }
+        }
+      ]
+    },
+    {
+      "id": "step_5_equation_summary",
+      "narration": "To summarize the chemical transformation [equation], we write the overall reaction, and balance the stoichiometry [balanced].",
+      "ops": [
+        {
+          "op": "DIM",
+          "anchor": "equation",
+          "targetIds": ["sun", "co2_in", "h2o_in"]
+        },
+        {
+          "op": "DRAW",
+          "anchor": "equation",
+          "element": {
+            "id": "eq_word",
+            "type": "latex",
+            "math": "\\text{Light} + 6\\text{CO}_2 + 6\\text{H}_2\\text{O} = \\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2",
+            "size": "md",
+            "placement": {
+              "type": "root"
+            },
+            "color": "default"
+          }
+        },
+        {
+          "op": "DRAW",
+          "anchor": "balanced",
+          "element": {
+            "id": "eq_chemical",
+            "type": "latex",
+            "math": "6\\text{CO}_2 + 6\\text{H}_2\\text{O} \\xrightarrow{h\\nu} \\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2",
+            "size": "md",
+            "placement": {
+              "type": "relative",
+              "relativeTo": "eq_word",
+              "position": "below-aligned-eq",
+              "offset": "sm"
+            },
+            "color": "accent"
+          }
+        },
+        {
+          "op": "UNDERLINE",
+          "anchor": "balanced",
+          "targetId": "eq_chemical",
+          "color": "accent"
+        }
+      ]
+    }
+  ]
+}
+
