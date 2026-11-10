@@ -1,5 +1,6 @@
 import type { Shape } from "../../../lib/board";
 import { mathText } from "../../../lib/mathtext";
+import { sketchLine, sketchRect, sketchEllipse, sketchArrow } from "../../../lib/sketch";
 
 const ICON_PATHS = {
   crown: "M3 18h18M4 18l-1-10 5 4 4-7 4 7 5-4-1 10z",
@@ -20,27 +21,36 @@ export function renderShape(s: Shape) {
   const ink = `var(--ink-${s.color})`;
   const st = { stroke: ink, strokeWidth: 3, strokeLinecap: "round", strokeLinejoin: "round", fill: "none", pathLength: 1 } as const;
   switch (s.type) {
-    case "line":
-      return <line x1={s.from[0]} y1={s.from[1]} x2={s.to[0]} y2={s.to[1]} {...st} />;
-    case "highlight":
-      return <line x1={s.from[0]} y1={s.from[1]} x2={s.to[0]} y2={s.to[1]} {...st} strokeWidth={24} opacity={0.3} />;
+    case "line": {
+      const d = sketchLine(s.from[0], s.from[1], s.to[0], s.to[1]);
+      return <path d={d} {...st} />;
+    }
+    case "highlight": {
+      const d = sketchLine(s.from[0], s.from[1], s.to[0], s.to[1]);
+      return <path d={d} {...st} strokeWidth={24} opacity={0.3} />;
+    }
     case "arrow": {
       const [x1, y1] = s.from, [x2, y2] = s.to;
-      const a = Math.atan2(y2 - y1, x2 - x1);
-      const h = (d: number) => `${x2 - 16 * Math.cos(a + d)} ${y2 - 16 * Math.sin(a + d)}`;
+      const { shaftPath, headPath } = sketchArrow(x1, y1, x2, y2);
       return (
         <g>
-          <line x1={x1} y1={y1} x2={x2} y2={y2} {...st} />
-          <path d={`M${h(0.5)} L${x2} ${y2} L${h(-0.5)}`} {...st} />
+          <path d={shaftPath} {...st} />
+          <path d={headPath} {...st} />
         </g>
       );
     }
-    case "circle":
-      return <circle cx={s.x} cy={s.y} r={s.r} {...st} />;
-    case "ellipse":
-      return <ellipse cx={s.x} cy={s.y} rx={s.rx} ry={s.ry} {...st} />;
-    case "rect":
-      return <rect x={s.x} y={s.y} width={s.w} height={s.h} {...st} />;
+    case "circle": {
+      const d = sketchEllipse(s.x, s.y, s.r, s.r);
+      return <path d={d} {...st} />;
+    }
+    case "ellipse": {
+      const d = sketchEllipse(s.x, s.y, s.rx, s.ry);
+      return <path d={d} {...st} />;
+    }
+    case "rect": {
+      const d = sketchRect(s.x, s.y, s.w, s.h);
+      return <path d={d} {...st} />;
+    }
     case "path":
       return <path d={s.d} {...st} />;
     case "text":

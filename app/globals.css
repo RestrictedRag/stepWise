@@ -38,3 +38,8 @@ body {
 .fade { opacity: 0; animation: fade 0.5s ease forwards; }
 @keyframes draw { to { stroke-dashoffset: 0; } }
 @keyframes fade { to { opacity: 1; } }
+
+@keyframes board-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
