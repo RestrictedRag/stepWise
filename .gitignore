@@ -12,3 +12,8 @@ graphify-out/
 AGENTS.md
 .playwright-mcp/
 evidence-bundle.json
+FINDINGS.md
+*findings*.md
+apk/
+*.apk
+
