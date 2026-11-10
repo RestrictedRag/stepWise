@@ -21,13 +21,26 @@ const mockStep0: CompiledStepManifest = {
       shape: { type: "circle", x: 500, y: 350, r: 80, color: "purple" },
       color: "purple",
     },
+  ],
+};
+
+const stepWithOneDraw: CompiledStepManifest = {
+  stepIndex: 0,
+  speech: {
+    durationMs: 3000,
+    transcript: "Step zero text.",
+    timingSource: "forced_alignment",
+    alignmentConfidence: 1.0,
+    speechMarks: [],
+  },
+  commands: [
     {
-      id: "elem_erase",
-      action: "ERASE",
-      startMs: 2000,
-      durationMs: 400,
-      targetIds: ["elem_circle"],
-      technique: "fade",
+      id: "d1",
+      action: "DRAW",
+      startMs: 500,
+      durationMs: 800,
+      shape: { type: "circle", x: 500, y: 350, r: 80, color: "purple" },
+      color: "purple",
     },
   ],
 };
@@ -64,12 +77,10 @@ test("GlobalPlaybackEngine calculates global timeline and step offsets across st
   const stateMid0 = engine.computeStateAt(1000);
   assert.equal(stateMid0.currentStepIndex, 0);
   assert.ok(stateMid0.activeCommandIds.has("elem_circle"));
-  assert.equal(stateMid0.erasedElementIds.has("elem_circle"), false);
 
-  // At t = 1500ms: circle draw completed, before erase at 2000ms
+  // At t = 1500ms: circle draw completed
   const stateDoneCircle = engine.computeStateAt(1500);
   assert.ok(stateDoneCircle.completedCommandIds.has("elem_circle"));
-  assert.equal(stateDoneCircle.erasedElementIds.has("elem_circle"), false);
 
   // In step 1 (t = 4500ms): global time 4500ms -> step 1 local time 1500ms
   const stateMid1 = engine.computeStateAt(4500);
@@ -83,16 +94,15 @@ test("GlobalPlaybackEngine calculates global timeline and step offsets across st
 test("GlobalPlaybackEngine guarantees deterministic state on bidirectional scrub (seek forward, backward, forward)", () => {
   const engine = new GlobalPlaybackEngine([mockStep0, mockStep1]);
 
-  // Scrub 1: Seek forward to 2500ms (circle is erased)
+  // Scrub 1: Seek forward to 2500ms
   engine.startScrub();
   engine.scrubToGlobalMs(2500);
   const stateForward1 = engine.computeStateAt(2500);
-  assert.ok(stateForward1.erasedElementIds.has("elem_circle"));
+  assert.ok(stateForward1.completedCommandIds.has("elem_circle"));
 
-  // Scrub 2: Seek backward to 1500ms (before erase was triggered)
+  // Scrub 2: Seek backward to 1500ms
   engine.scrubToGlobalMs(1500);
   const stateBackward = engine.computeStateAt(1500);
-  assert.equal(stateBackward.erasedElementIds.has("elem_circle"), false);
   assert.ok(stateBackward.completedCommandIds.has("elem_circle"));
 
   // Scrub 3: Seek forward again to 2500ms
@@ -105,13 +115,29 @@ test("GlobalPlaybackEngine guarantees deterministic state on bidirectional scrub
 
   assert.deepEqual(Array.from(stateForward2.completedCommandIds), Array.from(freshState.completedCommandIds));
   assert.deepEqual(Array.from(stateForward2.activeCommandIds), Array.from(freshState.activeCommandIds));
-  assert.deepEqual(Array.from(stateForward2.erasedElementIds), Array.from(freshState.erasedElementIds));
   assert.deepEqual(Array.from(stateForward2.commandProgress.entries()), Array.from(freshState.commandProgress.entries()));
-  assert.deepEqual(Array.from(stateForward2.eraseProgress.entries()), Array.from(freshState.eraseProgress.entries()));
 
   freshEngine.destroy();
   engine.endScrub(false);
   engine.destroy();
+});
+
+test("completed commands never fade or erase", () => {
+  const engine = new GlobalPlaybackEngine([stepWithOneDraw]);
+  const s = engine.computeStateAt(999_999);
+  assert.equal(s.commandProgress.get("d1"), 1);
+  assert.equal(s.eraseProgress.size, 0);
+  assert.equal(s.erasedElementIds.size, 0);
+});
+
+test("progress is non-decreasing over time", () => {
+  const engine = new GlobalPlaybackEngine([stepWithOneDraw]);
+  let prev = -1;
+  for (let t = 0; t <= 3000; t += 16) {
+    const p = engine.computeStateAt(t).commandProgress.get("d1")!;
+    assert.ok(p >= prev && p <= 1);
+    prev = p;
+  }
 });
 
 test("GlobalPlaybackEngine supports streaming stall and resume when next step arrives", () => {

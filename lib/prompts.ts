@@ -49,6 +49,7 @@ export function pedagogyPrompt(req: LessonRequest): string {
     : "";
 
   return `You are StepWise Pedagogy Agent, a master educator. 
+Topic: ${req.topic}
 Explain the topic for a ${req.level}-school student as ${PERSONA_TONE[req.persona]}.${styleLine}
 Language: ${langConfig.name} (${langConfig.code}).
 
@@ -60,13 +61,36 @@ Choose the most suitable macroBlueprint for the visual demonstration:
 - "cycle": For repeating cycles (e.g. Water cycle, Nitrogen cycle).
 - "freeform": For general diagrams.
 
+NARRATION RULES
+- Teach like a patient tutor sitting next to the student. Explain WHY each step works, not only what to do.
+- Before a calculation, say what we are about to find and why we need it.
+- After a result, say what it means in plain words and check it makes sense.
+- Use short spoken sentences in "say". No markdown, no LaTeX in "say"; say math out loud ("x squared").
+- 3 to 6 spoken sentences per step in "say".
+- "note" is the board text. It is NOT a copy of "say". Write a heading, a key fact, or a formula, the way a teacher writes on a whiteboard.
+- "note" is 3 to 12 words and at most 90 characters. One line. No markdown, no bullet marks, no quotes around it.
+- "note" may contain simple math between $$ signs, for example $$6CO_2 + 6H_2O$$. Avoid backslash commands; if one is truly needed, write the backslash twice because this is JSON.
+- Every step must have a "note".
+
+DIAGRAM RULES
+- "diagram" is a brief for an illustrator who will draw a picture of the real thing this step explains.
+- Use it when the subject has a shape, a structure, a layout or a flow that a student should SEE: an organ, a cell, a circuit, a force diagram, a geometric figure, a graph, a cycle, a machine, a map of a process.
+- Name the subject and the view, list every part to show, list the labels, and say what the arrows show.
+  Example: "Front-view cross-section of the human heart. Show four chambers: right atrium, right ventricle, left atrium, left ventricle. Show the vena cava, pulmonary artery, pulmonary veins and aorta. Blue arrows: oxygen-poor blood from the body into the right atrium, down to the right ventricle, out through the pulmonary artery to the lungs. Red arrows: oxygen-rich blood from the lungs into the left atrium, down to the left ventricle, out through the aorta. Label every chamber and vessel."
+- Never ask for a generic shape (a circle, a box) to stand in for the subject.
+- Use null when a picture adds nothing, for example a step that is only algebra or only a definition.
+- At most 3 steps in the lesson have a diagram. Put it on the step where the subject is first explained.
+- Write the brief in English, 30 to 90 words.
+
 Reply with ONE JSON object and nothing else (no markdown, no preamble):
 {
   "title": string,
   "subtitle": string | null,
   "steps": [
     {
-      "say": string, // 1-2 spoken natural sentences (15-20s duration) in ${langConfig.name}
+      "say": string, // 3 to 6 spoken natural sentences in ${langConfig.name}
+      "note": string, // what the tutor writes on the board for this step: 3 to 12 words, at most 90 characters
+      "diagram": "<drawing brief, or null>",
       "visualIntent": {
         "concept": string, // Core concept demonstrated in this step
         "keyTerms": string[], // 1-3 critical nouns/terms spoken in "say" that MUST have a visual representation
@@ -114,7 +138,7 @@ Visual Intent:
 - Key Terms needing visual: ${visualIntent.keyTerms.join(", ")}
 - Board End State: ${visualIntent.boardEndState || "Clean diagram"}
 
-Elements already drawn on board from previous steps (available for HIGHLIGHT, ERASE, or arrow docking):
+Elements already drawn on board from previous steps (available for HIGHLIGHT or arrow docking):
 ${existingElementIds.length > 0 ? existingElementIds.join(", ") : "None (board is currently blank)"}
 
 Available Actions:
@@ -129,8 +153,12 @@ Available Actions:
      * {"type": "formula", "latex": string, "slotId"?: string}
    - color: "ink" | "purple" | "orange" | "green" | "red" | "blue"
 2. HIGHLIGHT: {"targetId": string (must be drawn earlier), "style": "pulse"|"marker"}
-3. ERASE: {"targetIds": string[] (must be drawn earlier), "technique": "fade"|"reverse_dash"}
-4. TRANSITION: {"technique": "fade", "preserve": string[] (elements to keep alive), "nextBlueprint"?: string}
+
+BOARD RULES
+- The board is never erased. Every new item is written below or beside earlier items. Never emit erase or transition actions.
+- Board text is a SHORT PARAPHRASED NOTE of the narration, at most 8 words or one equation. Never copy narration sentences onto the board.
+- Put math in LaTeX between $...$ (for example "$x^2 + 3x = 10$").
+- Anchor each board command to the word in the narration where the idea is first spoken.
 
 Connector Docking Rules:
 - Connectors MUST specify "from": {"elementId": "..."} and "to": {"elementId": "..."}.
@@ -237,18 +265,17 @@ Available Actions:
      * {"type": "formula", "latex": string, "slotId"?: string}
    - color: "ink" | "purple" | "orange" | "green" | "red" | "blue"
 2. HIGHLIGHT: {"targetId": string (must be drawn in this or prior steps), "style": "pulse"|"marker"}
-3. ERASE: {"targetIds": string[], "technique": "fade"|"reverse_dash"}
-4. TRANSITION: {"technique": "fade", "preserve": string[] (persistent IDs), "nextBlueprint"?: string}
+
+BOARD RULES
+- The board is never erased. Every new item is written below or beside earlier items. Never emit erase or transition actions.
+- Board text is a SHORT PARAPHRASED NOTE of the narration, at most 8 words or one equation. Never copy narration sentences onto the board.
+- Put math in LaTeX between $...$ (for example "$x^2 + 3x = 10$").
+- Anchor each board command to the word in the narration where the idea is first spoken.
 
 Connector Docking Rules:
 - Connectors MUST specify "from": {"elementId": "..."} and "to": {"elementId": "..."}.
 - Both endpoint element IDs MUST exist on the board.
 - If "port" is omitted, the engine automatically selects facing docking ports.
-
-Scene & Transition Rules:
-- A scene is the span between two TRANSITIONs.
-- When shifting focus to a new visual concept, or when slots are full, emit a TRANSITION action with "preserve" listing element IDs to keep alive into the next scene, or empty [] to clear the board.
-- Slots have strict capacities: "core_subject" (cap: 1), "inputs" (cap: 3), "outputs" (cap: 3). Never exceed slot capacity without a TRANSITION.
 
 Anchoring Rules:
 - Every command MUST have an "anchor": {"wordIndex": integer, "offsetMs": -150}.
@@ -326,4 +353,42 @@ Reply with ONE JSON object containing all steps:
     ...
   ]
 }`;
+}
+
+export function diagramPrompt(lessonTitle: string, say: string, brief: string, lang: string): string {
+  return `Draw one teaching diagram as SVG for a whiteboard lesson.
+
+Lesson: ${lessonTitle}
+The tutor says while this is on the board: "${say}"
+What to draw: ${brief}
+
+Draw the real subject the way a good textbook figure does, so a student recognises it at a glance.
+
+OUTPUT
+- Reply with one JSON object: {"svg": "<the whole svg as one string>"} and nothing else.
+- Inside "svg", write one <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 700"> ... </svg> under 12000 characters. No markdown fence, no explanation.
+
+ALLOWED
+- Elements: svg, g, path, rect, circle, ellipse, line, polyline, polygon, text, tspan, defs, marker, title.
+- Nothing else. No style, script, image, use, foreignObject, animate, filter, clipPath or mask elements. No event attributes. No links, no external fonts, no url() except url(#id) for a marker defined in this SVG.
+
+DRAWING
+- Build the outline of the subject from <path> curves (C, Q, A commands). Draw its real parts in their real positions and rough proportions.
+- A plain circle or box must never stand in for the subject. Use circles and boxes only for things that really are round or square.
+- Strokes: stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round".
+- Fills: fill="none", or a light tint of a palette colour with fill-opacity at most 0.18.
+- Colours, only these: ink #2b2b2b, purple #7b4fd6, orange #e8833a, green #1f7a4d, red #d9443a, blue #2f6bff. The board background is light (#fbfbfd / #faf8f3); do not draw a background rectangle.
+- Keep everything at least 40 units inside the 1000 by 700 area.
+
+LABELS
+- 4 to 10 short labels, written in the language "${lang}".
+- <text font-family="sans-serif" font-size="24" fill="#2b2b2b">. Place outer labels in wide left/right margins or well-staggered rows (at least 60 units apart vertically and 180 units apart horizontally if on the same row) with a thin leader line (stroke-width="1.5") so adjacent labels never collide.
+- Labels must not overlap each other or the drawing. Write & as &amp; and < as &lt;.
+- No sentences, no heading, no paragraph text.
+
+FLOW AND DIRECTION
+- Leave vessels/tubes open at their outer ends (two parallel open lines, never capped boxes). Match every arrowhead to real direction (inputs pointing IN toward the subject, outputs pointing OUT; venous blood entering atria, arterial blood exiting ventricles).
+- Show movement with arrows: define one <marker id="arrow"> per arrow colour in <defs> and use marker-end="url(#id)".
+- Use colour to separate kinds of flow (for example blue for oxygen-poor blood, red for oxygen-rich blood) and add a small two-line legend in a corner.
+`;
 }

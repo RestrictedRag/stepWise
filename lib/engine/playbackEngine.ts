@@ -73,6 +73,7 @@ export class GlobalPlaybackEngine {
 
   public bindStepAudio(stepIndex: number, audio: HTMLAudioElement) {
     audio.playbackRate = this.speed;
+    audio.preservesPitch = true;
     this.audios.set(stepIndex, audio);
   }
 
@@ -108,6 +109,7 @@ export class GlobalPlaybackEngine {
     this.speed = Math.max(0.25, Math.min(3.0, multiplier));
     this.audios.forEach((audio) => {
       audio.playbackRate = this.speed;
+      audio.preservesPitch = true;
     });
   }
 
@@ -173,6 +175,7 @@ export class GlobalPlaybackEngine {
         activeAudio.currentTime = localSec;
       }
       activeAudio.playbackRate = this.speed;
+      activeAudio.preservesPitch = true;
       activeAudio.play().catch(() => {});
     } else {
       if (!activeAudio.paused) activeAudio.pause();
@@ -274,24 +277,13 @@ export class GlobalPlaybackEngine {
 
       for (const cmd of step.commands) {
         const cmdEnter = cmd.enterMs !== undefined ? offset + cmd.enterMs : offset + cmd.startMs;
-        const cmdExit = cmd.exitMs !== undefined && cmd.exitMs !== Infinity ? offset + cmd.exitMs : Infinity;
         const cmdDrawDuration = Math.max(1, cmd.durationMs);
-
-        // Check ERASE targets
-        if (cmd.action === "ERASE" && globalMs >= cmdEnter) {
-          const eraseProg = Math.max(0, Math.min(1, (globalMs - cmdEnter) / cmdDrawDuration));
-          cmd.targetIds.forEach((tid) => {
-            const curP = eraseProgress.get(tid) ?? 0;
-            eraseProgress.set(tid, Math.max(curP, eraseProg));
-            if (eraseProg >= 0.99) erasedElementIds.add(tid);
-          });
-        }
 
         if (globalMs < cmdEnter) {
           commandProgress.set(cmd.id, 0.0);
         } else if (globalMs < cmdEnter + cmdDrawDuration) {
           activeCommandIds.add(cmd.id);
-          const progress = (globalMs - cmdEnter) / cmdDrawDuration;
+          const progress = Math.min(1, Math.max(0, (globalMs - cmdEnter) / cmdDrawDuration));
           commandProgress.set(cmd.id, progress);
 
           if (cmd.action === "HIGHLIGHT") {
@@ -301,20 +293,8 @@ export class GlobalPlaybackEngine {
             });
           }
         } else {
-          // Drawing completed
           completedCommandIds.add(cmd.id);
           commandProgress.set(cmd.id, 1.0);
-
-          // Check pure 300ms exit fade for elements transitioning out
-          if (globalMs >= cmdExit) {
-            const exitElapsed = globalMs - cmdExit;
-            const fadeProgress = Math.max(0, Math.min(1, exitElapsed / 300));
-            const curEraseP = eraseProgress.get(cmd.id) ?? 0;
-            eraseProgress.set(cmd.id, Math.max(curEraseP, fadeProgress));
-            if (fadeProgress >= 0.99) {
-              erasedElementIds.add(cmd.id);
-            }
-          }
         }
       }
     }

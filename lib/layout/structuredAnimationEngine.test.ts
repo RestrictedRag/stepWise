@@ -163,14 +163,14 @@ test("validator enforces 3-stage repair: fuzzy match, report error, drop connect
   assert.ok(res.errors.some((e) => e.includes("Dropping connector")));
 });
 
-test("validator enforces slot capacity per scene and requires TRANSITION on overflow", () => {
+test("slot overflow places object below, no error", () => {
   // process_flow inputs slot has capacity 3
   const commands: any[] = [
-    { id: "in_1", action: "DRAW", startMs: 100, durationMs: 400, slotId: "inputs", shape: { type: "circle", x: 100, y: 200, r: 20, color: "ink" }, color: "ink" },
-    { id: "in_2", action: "DRAW", startMs: 200, durationMs: 400, slotId: "inputs", shape: { type: "circle", x: 100, y: 300, r: 20, color: "ink" }, color: "ink" },
-    { id: "in_3", action: "DRAW", startMs: 300, durationMs: 400, slotId: "inputs", shape: { type: "circle", x: 100, y: 400, r: 20, color: "ink" }, color: "ink" },
+    { id: "in_1", action: "DRAW", startMs: 100, durationMs: 400, slotId: "inputs", shape: { type: "rect", x: 100, y: 130, w: 200, h: 50, color: "ink" }, color: "ink" },
+    { id: "in_2", action: "DRAW", startMs: 200, durationMs: 400, slotId: "inputs", shape: { type: "rect", x: 100, y: 200, w: 200, h: 50, color: "ink" }, color: "ink" },
+    { id: "in_3", action: "DRAW", startMs: 300, durationMs: 400, slotId: "inputs", shape: { type: "rect", x: 100, y: 270, w: 200, h: 50, color: "ink" }, color: "ink" },
     // 4th element exceeds capacity 3!
-    { id: "in_4", action: "DRAW", startMs: 400, durationMs: 400, slotId: "inputs", shape: { type: "circle", x: 100, y: 500, r: 20, color: "ink" }, color: "ink" },
+    { id: "in_4", action: "DRAW", startMs: 400, durationMs: 400, slotId: "inputs", shape: { type: "rect", x: 100, y: 340, w: 200, h: 50, color: "ink" }, color: "ink" },
   ];
 
   const res = manifestValidator.validateCompiledStep(
@@ -184,39 +184,10 @@ test("validator enforces slot capacity per scene and requires TRANSITION on over
     "process_flow"
   );
 
-  assert.equal(res.valid, false);
-  assert.ok(res.errors.some((e) => e.includes("exceeded capacity (4/3). A TRANSITION is required.")));
-});
-
-test("pure playback engine guarantees identical state across forward and backward scrubbing", () => {
-  const step0: CompiledStepManifest = {
-    stepIndex: 0,
-    speech: { durationMs: 5000, transcript: "Step 0", timingSource: "syllable_estimate", alignmentConfidence: 0.8, speechMarks: [] },
-    commands: [
-      { id: "elem_leaf", action: "DRAW", startMs: 500, durationMs: 500, enterMs: 500, exitMs: Infinity, shape: { type: "circle", x: 500, y: 350, r: 80, color: "green" }, color: "green" },
-      { id: "elem_sun", action: "DRAW", startMs: 1200, durationMs: 400, enterMs: 1200, exitMs: 3000, shape: { type: "circle", x: 200, y: 200, r: 30, color: "orange" }, color: "orange" },
-      { id: "trans_1", action: "TRANSITION", startMs: 3000, durationMs: 300, enterMs: 3000, exitMs: 3300, technique: "fade", preserve: ["elem_leaf"] },
-    ],
-  };
-
-  const engine = new GlobalPlaybackEngine([step0]);
-
-  // Evaluate at t = 2000ms: both leaf and sun are completed and visible
-  const stateA = engine.computeStateAt(2000);
-  assert.equal(stateA.completedCommandIds.has("elem_leaf"), true);
-  assert.equal(stateA.completedCommandIds.has("elem_sun"), true);
-  assert.equal(stateA.erasedElementIds.has("elem_sun"), false);
-
-  // Seek forward to t = 4000ms (after transition): elem_sun is transitioned out
-  const stateB = engine.computeStateAt(4000);
-  assert.equal(stateB.completedCommandIds.has("elem_leaf"), true);
-  assert.equal(stateB.erasedElementIds.has("elem_sun"), true);
-
-  // Seek backward to t = 2000ms: verify state is 100% pure and identical to stateA
-  const stateC = engine.computeStateAt(2000);
-  assert.deepEqual(Array.from(stateC.activeCommandIds), Array.from(stateA.activeCommandIds));
-  assert.deepEqual(Array.from(stateC.completedCommandIds), Array.from(stateA.completedCommandIds));
-  assert.deepEqual(Array.from(stateC.erasedElementIds), Array.from(stateA.erasedElementIds));
-  assert.equal(stateC.commandProgress.get("elem_sun"), 1.0);
-  assert.equal(stateC.eraseProgress.get("elem_sun") ?? 0, 0);
+  assert.equal(res.errors.length, 0);
+  assert.equal(res.valid, true);
+  const placed = commands.map((c) => c.shape);
+  const last = placed.at(-1)!;
+  const maxBottom = Math.max(...placed.slice(0, -1).map((p: any) => p.y + p.h));
+  assert.ok(last.y >= maxBottom + 48);
 });

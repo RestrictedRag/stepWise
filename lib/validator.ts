@@ -9,7 +9,7 @@ import {
   type ChoreographerCommand,
   type MacroBlueprint,
 } from "./manifest.ts";
-import { BLUEPRINT_SLOTS } from "./layout/layoutEngine.ts";
+import { BLUEPRINT_SLOTS, type AABB } from "./layout/layoutEngine.ts";
 import { tokenizeScript, findTermWordIndex } from "./tokenizer.ts";
 import type { SpeechMark } from "./tts/provider.ts";
 
@@ -145,23 +145,6 @@ export class ManifestValidator {
           }
         }
         repairedCommands.push(cmd);
-      } else if (cmd.action === "ERASE") {
-        const repairedTargets: string[] = [];
-        for (let tid of cmd.targetIds) {
-          if (!currentValidIds.has(tid)) {
-            const match = this.fuzzyMatchId(tid, currentValidIds);
-            if (match) {
-              repairedTargets.push(match);
-              repairedCount++;
-            } else {
-              errors.push(`ERASE command '${cmd.id}' targets unknown '${tid}'.`);
-            }
-          } else {
-            repairedTargets.push(tid);
-          }
-        }
-        cmd.targetIds = repairedTargets;
-        repairedCommands.push(cmd);
       } else {
         repairedCommands.push(cmd);
       }
@@ -198,6 +181,7 @@ export class ManifestValidator {
 
     const bp = activeBlueprint || visualIntent?.macroBlueprint || "freeform";
     const bpSlots = BLUEPRINT_SLOTS[bp] || [];
+    const placedAABBs: AABB[] = [];
 
     // Sort commands chronologically by startMs
     const sorted = [...commands].sort((a, b) => a.startMs - b.startMs);
@@ -216,18 +200,53 @@ export class ManifestValidator {
         const exitMs = drawCmd.exitMs ?? Infinity;
         elementLifecycles.set(cmd.id, { enterMs, exitMs });
 
-        // Slot capacity enforcement
+        // Slot capacity enforcement with fallback placement (D11)
         if (drawCmd.slotId) {
           const currentCount = (slotOccupancies.get(drawCmd.slotId) || 0) + 1;
           slotOccupancies.set(drawCmd.slotId, currentCount);
 
           const slotDef = bpSlots.find((s) => s.id === drawCmd.slotId);
           if (slotDef && currentCount > slotDef.capacity) {
-            errors.push(
-              `Slot '${drawCmd.slotId}' in blueprint '${bp}' exceeded capacity (${currentCount}/${slotDef.capacity}). A TRANSITION is required.`
-            );
+            // Place object at x = first slot's x, y = (max bottom of all placed AABBs) + 48
+            const firstSlot = bpSlots[0];
+            const firstSlotX = firstSlot ? firstSlot.rect.x : 40;
+            const maxBottom = placedAABBs.length > 0
+              ? Math.max(...placedAABBs.map((b) => b.y2))
+              : 0;
+            const newY = maxBottom + 48;
+            const shape = drawCmd.shape as any;
+            if (shape.x !== undefined && shape.y !== undefined) {
+              shape.x = firstSlotX;
+              shape.y = newY;
+            } else if (shape.from && shape.to) {
+              const dy = shape.to[1] - shape.from[1];
+              const dx = shape.to[0] - shape.from[0];
+              shape.from[0] = firstSlotX;
+              shape.from[1] = newY;
+              shape.to[0] = firstSlotX + dx;
+              shape.to[1] = newY + dy;
+            }
           }
         }
+
+        const s = drawCmd.shape as any;
+        const btm = s.type === "circle"
+          ? s.y + s.r
+          : s.type === "ellipse"
+          ? s.y + s.ry
+          : s.type === "rect"
+          ? s.y + s.h
+          : s.from && s.to
+          ? Math.max(s.from[1], s.to[1])
+          : s.y + (s.h ?? s.size ?? 40);
+
+        placedAABBs.push({
+          id: cmd.id,
+          x1: s.x ?? (s.from ? Math.min(s.from[0], s.to[0]) : 0),
+          y1: s.y ?? (s.from ? Math.min(s.from[1], s.to[1]) : 0),
+          x2: (s.x ?? 0) + (s.w ?? s.r ?? 100),
+          y2: btm,
+        });
 
         // Connector lifecycle validation
         if (drawCmd.shape.type === "line" || drawCmd.shape.type === "arrow") {
@@ -262,25 +281,6 @@ export class ManifestValidator {
           errors.push(
             `HIGHLIGHT command '${cmd.id}' targets '${cmd.targetId}' which was not drawn prior to ${cmd.startMs}ms.`
           );
-        }
-      } else if (cmd.action === "ERASE") {
-        for (const tid of cmd.targetIds) {
-          if (!drawnIds.has(tid)) {
-            errors.push(
-              `ERASE command '${cmd.id}' targets '${tid}' which was not drawn prior to ${cmd.startMs}ms.`
-            );
-          }
-        }
-      } else if (cmd.action === "TRANSITION") {
-        // Reset slot occupancies for preserved items across transition
-        if (cmd.nextBlueprint) {
-          const nextSlots = BLUEPRINT_SLOTS[cmd.nextBlueprint] || [];
-          const totalNextCapacity = nextSlots.reduce((sum, s) => sum + s.capacity, 0);
-          if (cmd.preserve.length > totalNextCapacity) {
-            errors.push(
-              `Preserved elements count (${cmd.preserve.length}) exceeds total capacity of next blueprint '${cmd.nextBlueprint}' (${totalNextCapacity}).`
-            );
-          }
         }
       }
     }

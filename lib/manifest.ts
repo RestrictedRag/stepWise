@@ -170,30 +170,9 @@ export const ChoreographerHighlightCommandSchema = z.object({
   style: z.enum(["pulse", "marker"]).default("pulse"),
 });
 
-export const ChoreographerEraseCommandSchema = z.object({
-  id: z.string(),
-  action: z.literal("ERASE"),
-  anchor: AnchorSchema,
-  targetIds: z.array(z.string()).min(1),
-  technique: z.enum(["fade", "reverse_dash"]).default("fade"),
-});
-
-// Scene transition command: fade out non-preserved elements and optionally switch blueprint
-export const ChoreographerTransitionCommandSchema = z.object({
-  id: z.string(),
-  action: z.literal("TRANSITION"),
-  technique: z.literal("fade").default("fade"),
-  anchor: AnchorSchema,
-  preserve: z.array(z.string()).default([]),
-  nextBlueprint: MacroBlueprintSchema.optional(),
-});
-export type ChoreographerTransitionCommand = z.infer<typeof ChoreographerTransitionCommandSchema>;
-
 export const ChoreographerCommandSchema = z.discriminatedUnion("action", [
   ChoreographerDrawCommandSchema,
   ChoreographerHighlightCommandSchema,
-  ChoreographerEraseCommandSchema,
-  ChoreographerTransitionCommandSchema,
 ]);
 export type ChoreographerCommand = z.infer<typeof ChoreographerCommandSchema>;
 
@@ -229,34 +208,9 @@ export interface CompiledHighlightCommand {
   style: "pulse" | "marker";
 }
 
-export interface CompiledEraseCommand {
-  id: string;
-  action: "ERASE";
-  startMs: number;
-  durationMs: number;
-  enterMs?: number;
-  exitMs?: number;
-  targetIds: string[];
-  technique: "fade" | "reverse_dash";
-}
-
-export interface CompiledTransitionCommand {
-  id: string;
-  action: "TRANSITION";
-  startMs: number;
-  durationMs: number;
-  enterMs?: number;
-  exitMs?: number;
-  technique: "fade";
-  preserve: string[];
-  nextBlueprint?: MacroBlueprint;
-}
-
 export type CompiledCommand =
   | CompiledDrawCommand
-  | CompiledHighlightCommand
-  | CompiledEraseCommand
-  | CompiledTransitionCommand;
+  | CompiledHighlightCommand;
 
 export interface CompiledStepManifest {
   stepIndex: number;
@@ -264,6 +218,8 @@ export interface CompiledStepManifest {
     audioUrl?: string;
     durationMs: number;
     transcript: string;
+    /** Short text written on the board. Absent on old lessons: the board then writes the transcript. */
+    note?: string;
     timingSource: "native_marks" | "forced_alignment" | "syllable_estimate";
     alignmentConfidence: number;
     speechMarks: Array<{
@@ -276,6 +232,8 @@ export interface CompiledStepManifest {
     }>;
   };
   commands: CompiledCommand[];
+  /** Model-drawn picture of the step's subject. When present the board shows it instead of the shape commands. */
+  diagram?: { svg: string; alt: string };
 }
 
 export interface LessonManifest {
@@ -336,7 +294,7 @@ export function boardScriptToManifest(script: BoardScript, stepDurationsMs?: num
         startMs,
         durationMs: Math.max(300, Math.min(1200, Math.round(durationMs / Math.max(1, n)))),
         enterMs: startMs,
-        exitMs: sIdx < script.steps.length - 1 ? durationMs : Infinity,
+        exitMs: Infinity,
         shape,
         color: shape.color,
       });

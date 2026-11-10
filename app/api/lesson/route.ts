@@ -20,7 +20,7 @@ export async function POST(req: Request) {
 
   // Multi-Stage Animation Pipeline: Pedagogy Agent -> Parallel TTS/Alignment -> Choreographer Agent -> Validator
   try {
-    const ask = (msgs: any[], maxTokens = 1200) => llmText(msgs, { temperature: 0.3, json: true, max_tokens: maxTokens });
+    const ask = (msgs: any[], maxTokens = 2500) => llmText(msgs, { temperature: 0.3, json: true, max_tokens: maxTokens });
     const generator = streamLessonManifest(parsed, ask);
 
     let result = await generator.next();

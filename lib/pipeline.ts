@@ -1,5 +1,5 @@
 // StepWise Multi-Stage Pipeline: Parallel TTS + Alignment, Sequential Choreographer, and Streaming Manifest
-import { pedagogyPrompt, choreographerPrompt, allStepsChoreographerPrompt } from "./prompts.ts";
+import { pedagogyPrompt, choreographerPrompt, allStepsChoreographerPrompt, diagramPrompt } from "./prompts.ts";
 import { normalizer } from "./normalizer.ts";
 import { tokenizeScript } from "./tokenizer.ts";
 import { getTtsProvider } from "./tts/registry.ts";
@@ -8,6 +8,8 @@ import { compileAnchors } from "./compiler/anchorCompiler.ts";
 import { layoutEngine, type LayoutContext } from "./layout/layoutEngine.ts";
 import { manifestValidator } from "./validator.ts";
 import { extractJson } from "./lesson.ts";
+import { cleanNote } from "./liveboard/reveal.ts";
+import { sanitizeDiagramSvg } from "./liveboard/diagramSvg.ts";
 import type { LessonRequest } from "./validate.ts";
 import type { Msg } from "./llm.ts";
 import type {
@@ -15,11 +17,19 @@ import type {
   CompiledStepManifest,
   CompiledCommand,
   StepChoreography,
-  ChoreographerTransitionCommand,
 } from "./manifest.ts";
+
+const seg = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+export function textRevealMs(text: string): number {
+  const n = [...seg.segment(text)].length;
+  return Math.max(700, Math.min(8000, n * 58));
+}
 
 export interface PedagogyStep {
   say: string;
+  note?: string;
+  /** Drawing brief for a picture of this step's subject. null or absent: no picture. */
+  diagram?: string | null;
   visualIntent: {
     concept: string;
     keyTerms: string[];
@@ -32,6 +42,54 @@ export interface PedagogyOutput {
   title: string;
   subtitle: string | null;
   steps: PedagogyStep[];
+}
+
+const MAX_DIAGRAMS = 3;
+const DIAGRAM_TIMEOUT_MS = 180000;
+const DIAGRAM_MAX_TOKENS = 6000;
+
+type StepDiagram = { svg: string; alt: string };
+
+// The reply is raw SVG, or {"svg": "..."} when the caller forces JSON.
+function pickSvg(reply: string): string {
+  try {
+    const j = extractJson(reply) as any;
+    if (j && typeof j.svg === "string") return j.svg;
+  } catch {}
+  return reply;
+}
+
+function drawDiagram(
+  ask: (msgs: Msg[], maxTokens?: number) => Promise<string>,
+  title: string,
+  say: string,
+  brief: string,
+  lang: string
+): Promise<StepDiagram | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<null>((resolve) => {
+    timer = setTimeout(() => {
+      console.warn(`[Pipeline] Diagram generation timed out after ${DIAGRAM_TIMEOUT_MS}ms`);
+      resolve(null);
+    }, DIAGRAM_TIMEOUT_MS);
+  });
+  const job = ask(
+    [
+      { role: "system", content: "You are an expert scientific illustrator who writes clean, hand-authored SVG." },
+      { role: "user", content: diagramPrompt(title, say, brief, lang) },
+    ],
+    DIAGRAM_MAX_TOKENS
+  )
+    .then((reply) => {
+      const svg = sanitizeDiagramSvg(pickSvg(reply));
+      if (!svg) console.warn("[Pipeline] Diagram reply rejected by sanitizeDiagramSvg");
+      return svg ? { svg, alt: brief.slice(0, 300) } : null;
+    })
+    .catch((err) => {
+      console.warn("[Pipeline] Diagram generation failed:", err);
+      return null;
+    });
+  return Promise.race([job, timeout]).finally(() => clearTimeout(timer));
 }
 
 export async function* streamLessonManifest(
@@ -60,12 +118,23 @@ export async function* streamLessonManifest(
     pedData = extractJson(repairReply) as PedagogyOutput;
   }
 
+  // Start diagram drawing now so it runs while TTS and choreography work.
+  // shortcut: runs up to MAX_DIAGRAMS LLM calls at once; make this sequential if the LLM provider returns 429.
+  let diagramCount = 0;
+  const diagramJobs: Array<Promise<StepDiagram | null>> = (pedData.steps || []).map((st) => {
+    const brief = typeof st.diagram === "string" ? st.diagram.trim() : "";
+    if (!brief || diagramCount >= MAX_DIAGRAMS) return Promise.resolve(null);
+    diagramCount++;
+    return drawDiagram(ask, pedData.title, st.say, brief, lang);
+  });
+
   const tts = getTtsProvider(lang);
 
   // Step 2: Sequential TTS + Alignment for all steps (avoids Gnani 429 concurrency rate limits)
   const preparedAudio: Array<{
     stepIndex: number;
     rawSay: string;
+    note?: string;
     tokens: any[];
     durationMs: number;
     alignRes: any;
@@ -93,6 +162,7 @@ export async function* streamLessonManifest(
     preparedAudio.push({
       stepIndex: i,
       rawSay: st.say,
+      note: st.note,
       tokens,
       durationMs: synthRes.durationMs,
       alignRes,
@@ -122,7 +192,7 @@ export async function* streamLessonManifest(
         { role: "system", content: "You are a master whiteboard visual choreographer. Output valid raw JSON immediately with no preamble or explanation." },
         { role: "user", content: allPrompt },
       ],
-      1200
+      3072
     );
 
     const parsedAll = extractJson(allReply) as any;
@@ -147,13 +217,6 @@ export async function* streamLessonManifest(
 
   const compiledSteps: CompiledStepManifest[] = [];
   const drawnElementIds = new Set<string>();
-
-  const stepOffsets: number[] = [];
-  let curStepOffset = 0;
-  for (let s = 0; s < pedData.steps.length; s++) {
-    stepOffsets.push(curStepOffset);
-    curStepOffset += preparedAudio[s].durationMs;
-  }
 
   for (let i = 0; i < pedData.steps.length; i++) {
     const prep = preparedAudio[i];
@@ -222,22 +285,8 @@ export async function* streamLessonManifest(
       } catch {}
     }
 
-    // If scene blueprint changes and no transition was emitted, synthesize a clean scene transition
-    const stepHasTransition = choreoData.commands.some((c) => c.action === "TRANSITION");
+    // If scene blueprint changes, update layout context scene blueprint and localized labels
     const targetBlueprint = pedStep.visualIntent.macroBlueprint || layoutCtx.sceneBlueprint || "process_flow";
-    if (i > 0 && !stepHasTransition && targetBlueprint !== layoutCtx.sceneBlueprint) {
-      const transCmd: ChoreographerTransitionCommand = {
-        id: `trans_scene_${i}`,
-        action: "TRANSITION",
-        anchor: { wordIndex: 0, offsetMs: -150 },
-        technique: "fade",
-        preserve: [],
-        nextBlueprint: targetBlueprint,
-      };
-      choreoData.commands.unshift(transCmd);
-    }
-
-    // Update layout context scene blueprint and localized labels
     layoutCtx.sceneBlueprint = targetBlueprint;
     Object.assign(layoutCtx.labels, choreoData.labels);
 
@@ -253,11 +302,15 @@ export async function* streamLessonManifest(
 
       if (cmd.action === "DRAW") {
         const shape = layoutEngine.resolveObject(cmd.id, cmd.semanticObject, cmd.color, layoutCtx);
+        let durationMs = timing.durationMs;
+        if ("text" in shape && typeof shape.text === "string") {
+          durationMs = textRevealMs(shape.text);
+        }
         compiledCommands.push({
           id: cmd.id,
           action: "DRAW",
           startMs,
-          durationMs: timing.durationMs,
+          durationMs,
           enterMs: startMs,
           exitMs: Infinity,
           slotId: (cmd.semanticObject as any).slotId,
@@ -276,73 +329,6 @@ export async function* streamLessonManifest(
           targetId: cmd.targetId,
           style: cmd.style,
         });
-      } else if (cmd.action === "ERASE") {
-        compiledCommands.push({
-          id: cmd.id,
-          action: "ERASE",
-          startMs,
-          durationMs: timing.durationMs,
-          enterMs: startMs,
-          exitMs: Infinity,
-          targetIds: cmd.targetIds,
-          technique: cmd.technique,
-        });
-        // Set exitMs for erased elements across all previous steps + current step
-        const eraseGlobalMs = stepOffsets[i] + startMs;
-        for (let k = 0; k < i; k++) {
-          for (const prevCmd of compiledSteps[k].commands) {
-            if (cmd.targetIds.includes(prevCmd.id)) {
-              prevCmd.exitMs = Math.max(0, eraseGlobalMs - stepOffsets[k]);
-            }
-          }
-        }
-        for (const prevCmd of compiledCommands) {
-          if (cmd.targetIds.includes(prevCmd.id)) {
-            prevCmd.exitMs = startMs;
-          }
-        }
-      } else if (cmd.action === "TRANSITION") {
-        compiledCommands.push({
-          id: cmd.id,
-          action: "TRANSITION",
-          startMs,
-          durationMs: 300,
-          enterMs: startMs,
-          exitMs: startMs + 300,
-          technique: "fade",
-          preserve: cmd.preserve,
-          nextBlueprint: cmd.nextBlueprint,
-        });
-
-        // Set exitMs for non-preserved elements across all previous steps + current step
-        const preservedSet = new Set(cmd.preserve);
-        const transGlobalMs = stepOffsets[i] + startMs;
-
-        for (let k = 0; k < i; k++) {
-          for (const prevCmd of compiledSteps[k].commands) {
-            if (prevCmd.action === "DRAW" && !preservedSet.has(prevCmd.id) && (prevCmd.exitMs === undefined || prevCmd.exitMs === Infinity)) {
-              prevCmd.exitMs = Math.max(0, transGlobalMs - stepOffsets[k]);
-            }
-          }
-        }
-
-        for (const prevCmd of compiledCommands) {
-          if (prevCmd.action === "DRAW" && !preservedSet.has(prevCmd.id) && (prevCmd.exitMs === undefined || prevCmd.exitMs === Infinity)) {
-            prevCmd.exitMs = startMs;
-          }
-        }
-
-        // Snap preserved elements to finished state
-        for (const pid of cmd.preserve) {
-          drawnElementIds.add(pid);
-        }
-
-        if (cmd.nextBlueprint) {
-          layoutCtx.sceneBlueprint = cmd.nextBlueprint;
-          if (layoutCtx.slotElementCounts) {
-            layoutCtx.slotElementCounts.clear();
-          }
-        }
       }
     }
 
@@ -358,16 +344,20 @@ export async function* streamLessonManifest(
       layoutCtx.sceneBlueprint
     );
 
+    const diagram = await diagramJobs[i];
+
     const stepManifest: CompiledStepManifest = {
       stepIndex: i,
       speech: {
         durationMs: prep.durationMs,
         transcript: prep.rawSay,
+        note: cleanNote(prep.note),
         timingSource: prep.alignRes.timingSource,
         alignmentConfidence: prep.alignRes.alignmentConfidence,
         speechMarks: prep.alignRes.marks,
       },
       commands: compiledCommands,
+      ...(diagram ? { diagram } : {}),
     };
 
     compiledSteps.push(stepManifest);
