@@ -103,9 +103,9 @@ export default function Chat({ id }: { id: string }) {
   return (
     <>
       {bar}
-      <main style={{ maxWidth: 760, margin: "0 auto", padding: "24px 16px" }}>
+      <main style={{ maxWidth: 760, margin: "0 auto", padding: "24px 16px", fontSize: 16, lineHeight: 1.65, color: "#1f2328" }}>
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 24 }}>
-          <div style={{ background: "var(--side)", borderRadius: 12, padding: "10px 14px", maxWidth: "80%" }}>
+          <div style={{ background: "var(--side)", borderRadius: 18, padding: "10px 16px", maxWidth: "70%", overflowWrap: "break-word" }}>
             {entry.image && <img src={`data:${entry.image.mediaType};base64,${entry.image.data}`} alt="Your upload" style={{ maxWidth: 160, borderRadius: 8, display: "block", marginBottom: 6 }} />}
             {entry.prompt}
           </div>
@@ -120,29 +120,50 @@ export default function Chat({ id }: { id: string }) {
 
         {parsed && (
           <>
-            <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
+            <div className="chat-cards">
               {[["Video Explanation", "Watch Now"], ["Tutor Me", "Start"]].map(([t, b]) => (
-                <div key={t} style={{ flex: "1 1 200px", border: "1px solid var(--line)", borderRadius: 12, padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <strong>{t}</strong>
-                  <button style={btn} onClick={() => go("whiteboard", entry.prompt)}>{b}</button>
+                <div key={t} className="chat-card">
+                  <strong style={{ fontSize: 15, fontWeight: 600 }}>{t}</strong>
+                  <button style={{ ...btn, fontSize: 14, flexShrink: 0, whiteSpace: "nowrap" }} onClick={() => go("whiteboard", entry.prompt)}>{b}</button>
                 </div>
               ))}
             </div>
-            <h2 style={{ color: "var(--blue)", fontSize: 18 }}>Explanation</h2>
-            {parsed.summary && <p dangerouslySetInnerHTML={{ __html: mathText(parsed.summary) }} />}
-            {parsed.steps.map((s, i) => (
-              <div key={i} style={{ display: "flex", gap: 12, margin: "16px 0" }}>
-                <span style={{ flex: "none", width: 26, height: 26, borderRadius: "50%", background: "var(--blue)", color: "#fff", display: "grid", placeItems: "center", fontSize: 13 }}>{i + 1}</span>
-                <div>
-                  <strong dangerouslySetInnerHTML={{ __html: mathText(s.title) }} />
-                  <div style={{ whiteSpace: "pre-wrap" }} dangerouslySetInnerHTML={{ __html: mathText(s.body) }} />
-                </div>
+            <h2 style={{ color: "var(--blue)", fontSize: 18, fontWeight: 600, margin: "24px 0 12px" }}>Explanation</h2>
+            {parsed.summary && (
+              <div
+                className="md"
+                style={{ marginBottom: parsed.steps.length ? 20 : 0 }}
+                dangerouslySetInnerHTML={{ __html: mathText(parsed.summary) }}
+              />
+            )}
+            {parsed.steps.length > 0 && (
+              <div className="chat-steps">
+                {parsed.steps.map((s, i) => {
+                  const title =
+                    s.title.replace(/^\s*(\*\*\s*)?Step\s+\d+\s*(?:[:.\-–—]\s*|\s+)/i, (_, b) => b ?? "").trim() ||
+                    s.title;
+                  return (
+                    <div key={i} className="chat-step">
+                      <span className="chat-step-num">{i + 1}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="md chat-step-title" dangerouslySetInnerHTML={{ __html: mathText(title) }} />
+                        {s.body && (
+                          <div
+                            className="md"
+                            style={{ marginTop: 4 }}
+                            dangerouslySetInnerHTML={{ __html: mathText(s.body) }}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
+            )}
             {done && (
-              <div style={{ background: "#eaf2ff", borderRadius: 12, padding: 16, margin: "16px 0", color: "#0b2a5b" }}>
-                <strong>Answer</strong>
-                <div dangerouslySetInnerHTML={{ __html: mathText(parsed.answer!) }} />
+              <div style={{ background: "var(--side)", border: "1px solid var(--line)", borderRadius: 10, padding: "12px 16px", margin: "20px 0 16px" }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", letterSpacing: "0.02em", marginBottom: 4 }}>Answer</div>
+                <div className="md" dangerouslySetInnerHTML={{ __html: mathText(parsed.answer!) }} />
               </div>
             )}
           </>

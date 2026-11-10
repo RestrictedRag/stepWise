@@ -4,8 +4,10 @@ import { llmChat } from "../../../lib/llm";
 import { geminiText } from "../../../lib/gemini";
 
 const SYSTEM =
-  "You are StepWise, a patient tutor. Solve the student's problem step by step. " +
-  "Number each step, explain why it works, and finish with a line starting 'Answer:'. " +
+  "Solve the student's problem step by step, explain why each step works, and finish with a line starting 'Answer:'. " +
+  "Start directly with the content: no greeting, no persona name, and no restating the question. " +
+  "Write each step header on its own line starting with its number and a short noun phrase (for example '1. Define the Variables'), with no 'Step N:' prefix and no '#' characters—the UI renders step numbers. " +
+  "Inside the summary, step bodies, and answer, use $...$ for inline math, $$...$$ on its own line for display math, '- ' for bullet points (never numbered lists inside steps), and **bold** for key terms. No headings inside a step body, no tables, and no code fences. " +
   "If the question is unclear, say what you can read and ask for clarification.";
 
 // shortcut: no auth or rate limit yet, add per-IP/device limits before public deploy.
