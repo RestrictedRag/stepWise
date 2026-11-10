@@ -3,3 +3,12 @@ node_modules
 .env*.local
 ui-ux/
 .superpowers/
+services/aligner/.venv/
+.venv/
+__pycache__/
+*.pyc
+graphify-out/
+*.tsbuildinfo
+AGENTS.md
+.playwright-mcp/
+evidence-bundle.json

@@ -4,7 +4,7 @@ export const COLORS = ["ink", "purple", "orange", "green", "red", "blue"] as con
 export const ICONS = ["crown", "bolt", "star", "check", "cross", "heart", "speech", "fire"] as const;
 export type Color = (typeof COLORS)[number];
 export type Icon = (typeof ICONS)[number];
-type Pt = [number, number];
+export type Pt = [number, number];
 
 export type Shape = { color: Color; at?: string } & (
   | { type: "line" | "arrow" | "highlight"; from: Pt; to: Pt }

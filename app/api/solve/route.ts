@@ -39,7 +39,8 @@ export async function POST(req: Request) {
     ], { stream: true });
   } catch (err) {
     console.error(err);
-    return Response.json({ error: "The solver is unavailable. Try again shortly." }, { status: 502 });
+    const limited = String(err).includes("rate-limited");
+    return Response.json({ error: limited ? "The solver is rate-limited. Try again in a few minutes." : "The solver is unavailable. Try again shortly." }, { status: limited ? 429 : 502 });
   }
 
   const encoder = new TextEncoder();

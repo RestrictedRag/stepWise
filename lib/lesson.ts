@@ -16,9 +16,27 @@ const FALLBACKS: [RegExp, unknown][] = [
 
 // Model text → parsed JSON value. Drops <think> blocks and any prose around the outermost object.
 export function extractJson(text: string): unknown {
-  const t = text.replace(/<think>[\s\S]*?<\/think>/g, "");
+  let t = text.replace(/<think>[\s\S]*?<\/think>/g, "");
+  // If think block was not closed, strip it
+  if (t.includes("<think>")) {
+    t = t.replace(/<think>[\s\S]*/g, "");
+  }
+
   const a = t.indexOf("{"), b = t.lastIndexOf("}");
-  if (a < 0 || b < a) throw new Error("No JSON object in the reply.");
+  if (a < 0 || b < a) {
+    // Fallback: search in markdown code fences or raw text
+    const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (fenceMatch) {
+      const fenced = fenceMatch[1];
+      const fa = fenced.indexOf("{"), fb = fenced.lastIndexOf("}");
+      if (fa >= 0 && fb >= fa) return JSON.parse(fenced.slice(fa, fb + 1));
+    }
+    const rawA = text.indexOf("{"), rawB = text.lastIndexOf("}");
+    if (rawA >= 0 && rawB >= rawA) {
+      return JSON.parse(text.slice(rawA, rawB + 1));
+    }
+    throw new Error("No JSON object in the reply.");
+  }
   return JSON.parse(t.slice(a, b + 1));
 }
 
