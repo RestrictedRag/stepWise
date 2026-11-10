@@ -10,3 +10,5 @@ __pycache__/
 graphify-out/
 *.tsbuildinfo
 AGENTS.md
+.playwright-mcp/
+evidence-bundle.json
